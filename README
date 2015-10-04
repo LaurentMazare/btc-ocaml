@@ -1,0 +1,30 @@
+1. Overview
+-----------
+btc-ocaml is a toy implementation of the bitcoin p2p protocol. For now it just connects to
+the bitcoin network and downloads the block headers for the full blockchain.
+Note that this is very experimental so bugs should be expected and in particular the
+downloaded blockchain should not be considered as the consensus blockchain as there is no
+proper check for this!
+
+2. Building
+-----------
+btc-ocaml can be built using opam on a linux platform as follows.
+  A. Install the following dependencies using opam as well as ocaml 4.01:
+    - cryptokit (1.10)
+    - core (111.28.01)
+    - async (111.25.00)
+  B. Build btc.native via the following command line:
+    corebuild btc.native -pkgs core -pkgs async -pkgs cryptokit
+
+3. Running
+----------
+First run the following command to obtain a list of possibles node to connect to.
+  dig seed.bitcoin.sipa.be
+Then run btc.native on any of the ip addresses returned by dig, the -blockchain flag is
+used to specify a file where the blockchain can be store and accessed.
+  ./btc.native X.X.X.X -blockchain ./blockchain.bin
+
+4. License
+----------
+btc-ocaml is distributed under the terms of GNU LGPL version 2.1 with ocaml linking
+exception. See the LICENSE.txt file for the full text.
