@@ -1,6 +1,12 @@
 open Core.Std
 open Async.Std
-let max_headers = 2_000
+module Hardcoded = struct
+  (* When answering an open Getheaders query, headers message should contain 2000 headers
+     except for the last message that contains less headers. *)
+  let max_headers = 2_000
+
+  let get_more_headers_after = sec 600.
+end
 
 let hex_of_char c =
   if Char.('0' <= c && c <= '9') then Char.to_int c - Char.to_int '0'
@@ -48,6 +54,7 @@ type t =
   ; mutable headers : Header.t list
   ; mutable current_tip_hash : string
   ; mutable has_changed_since_last_write : bool
+  ; mutable last_batch_processed : Time.t
   ; blockchain_file : string
   } with fields
 
@@ -67,6 +74,7 @@ let create ~blockchain_file ~stop =
     ; current_tip_hash = genesis_hash
     ; blockchain_file
     ; has_changed_since_last_write = false
+    ; last_batch_processed = Time.epoch
     }
   in
   Sys.file_exists blockchain_file
@@ -107,8 +115,9 @@ let create ~blockchain_file ~stop =
 let process_headers t address headers =
   match t.status with
   | Syncing sync_address when Address.(=) sync_address address ->
+    t.last_batch_processed <- Time.now ();
     let headers_len = List.length headers in
-    let at_tip = List.length headers < max_headers in
+    let at_tip = List.length headers < Hardcoded.max_headers in
     let headers_len_pre = List.length t.headers in
     List.iter headers ~f:(fun (header : Header.t) ->
       process_header t header ~mark_as_changed:true);
@@ -127,8 +136,14 @@ let not_connected t =
   | Syncing _ | At_tip -> false
 
 let maybe_start_syncing t node =
-  match t.status with
-  | Not_connected ->
+  let start_syncing =
+    match t.status with
+    | Syncing _ -> false
+    | Not_connected -> true
+    | At_tip ->
+      Time.(add t.last_batch_processed Hardcoded.get_more_headers_after <= now ())
+  in
+  if start_syncing then begin
     t.status <- Syncing node;
     Some (`from_hash t.current_tip_hash)
-  | Syncing _ | At_tip -> None
+  end else None
