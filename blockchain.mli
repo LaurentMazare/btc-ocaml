@@ -9,7 +9,7 @@ val create
 val process_headers
   :  t
   -> Address.t
-  -> Message.Headers.elem list
+  -> Header.t list
   -> [ `get_headers_from of string | `nothing ]
 
 val not_connected : t -> bool

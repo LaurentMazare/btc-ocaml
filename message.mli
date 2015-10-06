@@ -57,26 +57,8 @@ module Inv : sig
   type t = elem list with sexp
 end
 
-module Nbits : sig
-  type t =
-    { mantissa : int
-    ; exponent : int
-    } with sexp
-end
-
 module Headers : sig
-  type elem =
-    { version : int
-    ; previous_block_header_hash : string
-    ; merkle_root_hash : string
-    ; time : Time.t
-    ; nbits : Nbits.t
-    ; nonce : int
-    } with sexp, fields, bin_io
-
-  type t = elem list with sexp
-
-  val hash : elem -> string
+  type t = Header.t list with sexp
 end
 
 module Reject : sig
@@ -162,14 +144,14 @@ end
 
 module Block : sig
   type t =
-    { block_header : Headers.elem
+    { block_header : Header.t
     ; txns : Raw_transaction.t list
     } with sexp
 end
 
 module Merkleblock : sig
   type t =
-    { block_header : Headers.elem
+    { block_header : Header.t
     ; transaction_count : int
     ; hashes : string list
     ; flags : string

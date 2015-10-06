@@ -45,16 +45,16 @@ end
 
 type t =
   { mutable status : Status.t
-  ; mutable headers : Message.Headers.elem list
+  ; mutable headers : Header.t list
   ; mutable current_tip_hash : string
   ; mutable has_changed_since_last_write : bool
   ; blockchain_file : string
   } with fields
 
-let process_header t (header : Message.Headers.elem) ~mark_as_changed =
+let process_header t (header : Header.t) ~mark_as_changed =
   if String.(=) header.previous_block_header_hash t.current_tip_hash then begin
     t.headers <- header :: t.headers;
-    t.current_tip_hash <- Message.Headers.hash header;
+    t.current_tip_hash <- Header.hash header;
     if mark_as_changed then
       t.has_changed_since_last_write <- true;
   end else
@@ -76,7 +76,7 @@ let create ~blockchain_file ~stop =
     | `Yes ->
       Reader.with_file blockchain_file ~f:(fun reader ->
         let rec loop acc =
-          Reader.read_bin_prot reader Message.Headers.bin_reader_elem
+          Reader.read_bin_prot reader Header.bin_reader_t
           >>= function
           | `Eof ->
             return acc
@@ -96,7 +96,7 @@ let create ~blockchain_file ~stop =
     if t.has_changed_since_last_write then begin
       Writer.with_file t.blockchain_file ~f:(fun writer ->
         Deferred.List.iter t.headers ~f:(fun header ->
-          Writer.write_bin_prot writer Message.Headers.bin_writer_elem header;
+          Writer.write_bin_prot writer Header.bin_writer_t header;
           Writer.flushed writer)
       )
       >>| fun () -> t.has_changed_since_last_write <- false
@@ -110,7 +110,7 @@ let process_headers t address headers =
     let headers_len = List.length headers in
     let at_tip = List.length headers < max_headers in
     let headers_len_pre = List.length t.headers in
-    List.iter headers ~f:(fun (header : Message.Headers.elem) ->
+    List.iter headers ~f:(fun (header : Header.t) ->
       process_header t header ~mark_as_changed:true);
     if at_tip then begin
       let headers_len_post = List.length t.headers in
