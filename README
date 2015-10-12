@@ -18,11 +18,9 @@ btc-ocaml can be built using opam on a linux platform as follows.
 
 3. Running
 ----------
-First run the following command to obtain a list of possibles node to connect to.
-  dig seed.bitcoin.sipa.be
-Then run btc.native on any of the ip addresses returned by dig, the -blockchain flag is
-used to specify a file where the blockchain can be store and accessed.
-  ./btc.native X.X.X.X -blockchain ./blockchain.bin
+The -blockchain flag is used to specify a file where the blockchain can be store and
+accessed.
+  ./btc.native -blockchain ./blockchain.bin
 
 4. License
 ----------
