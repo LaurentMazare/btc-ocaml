@@ -3,6 +3,12 @@
 open Core.Std
 open Async.Std
 
+let dns_server = "8.8.8.8"
+
+let dns_domains =
+  [ "seed.bitcoin.sipa.be"
+  ]
+
 let () =
   Command.async_basic
     ~summary:"test"
@@ -10,12 +16,15 @@ let () =
       empty
       +> flag "-blockchain" (optional_with_default "./blockchain.bin" string)
         ~doc:"FILE file to load/store the blockchain headers from."
-      +> anon ("address" %: string)
     )
-    (fun blockchain_file ipv4_address () ->
+    (fun blockchain_file () ->
       Network.create ~blockchain_file
       >>= fun network ->
-      Network.add_node network ~ipv4_address ~port:8333;
+      Deferred.List.iter dns_domains ~f:(fun domain ->
+        Dns_lookup.query ~dns_server ~domain ~f:(fun ipv4_address ->
+          Network.add_node network ~ipv4_address ~port:8333)
+      )
+      >>= fun () ->
       Deferred.never ()
       >>| fun () -> Network.close network
     )
