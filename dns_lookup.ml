@@ -18,11 +18,29 @@ let consume_domain buffer =
   let _qclass = Iobuf.Consume.uint16_be buffer in
   ()
 
-let query ~dns_server ~domain ~f =
-  let udp_sendto = Udp.sendto () |> Or_error.ok_exn in
-  Udp.bind_any ()
-  >>= fun udp ->
-  let iobuf = Iobuf.create ~len:8192 in
+let consume_iobuf iobuf ~f =
+  let _nonce = Iobuf.Consume.uint16_be iobuf in
+  let _flags = Iobuf.Consume.uint16_be iobuf in
+  let qdcount = Iobuf.Consume.uint16_be iobuf in
+  let ancount = Iobuf.Consume.uint16_be iobuf in
+  let _nscount = Iobuf.Consume.uint16_be iobuf in
+  let _arcount = Iobuf.Consume.uint16_be iobuf in
+  for _i = 0 to qdcount - 1 do
+    consume_domain iobuf
+  done;
+  for _i = 0 to ancount - 1 do
+    consume_domain iobuf;
+    let _time = Iobuf.Consume.uint32_be iobuf in
+    let len = Iobuf.Consume.uint16_be iobuf in
+    let rdata = Iobuf.Consume.string ~len iobuf in
+    if len = 4 then
+      f (String.to_list rdata
+        |> List.map ~f:Char.to_int 
+        |> List.map ~f:Int.to_string 
+        |> String.concat ~sep:".")
+  done
+
+let fill_iobuf iobuf ~domain =
   Iobuf.Fill.uint16_be iobuf (Random.int 65536);
   Iobuf.Fill.uint8 iobuf 1;
   Iobuf.Fill.uint8 iobuf 0;
@@ -37,31 +55,17 @@ let query ~dns_server ~domain ~f =
   Iobuf.Fill.uint8 iobuf 0;
   Iobuf.Fill.uint16_be iobuf 1; (* QTYPE *)
   Iobuf.Fill.uint16_be iobuf 1; (* QCLASS *)
-  Iobuf.flip_lo iobuf;
+  Iobuf.flip_lo iobuf
+
+let query ~dns_server ~domain ~f =
+  let udp_sendto = Udp.sendto () |> Or_error.ok_exn in
+  Udp.bind_any ()
+  >>= fun udp ->
+  let iobuf = Iobuf.create ~len:8192 in
+  fill_iobuf iobuf ~domain;
   Unix.Inet_addr.of_string_or_getbyname dns_server
   >>= fun dns_server ->
   udp_sendto (Socket.fd udp) iobuf (Socket.Address.Inet.create dns_server ~port:53)
   >>= fun () ->
-    Udp.read_loop (Socket.fd udp) (fun buffer ->
-      let _nonce = Iobuf.Consume.uint16_be buffer in
-      let _flags = Iobuf.Consume.uint16_be buffer in
-      let qdcount = Iobuf.Consume.uint16_be buffer in
-      let ancount = Iobuf.Consume.uint16_be buffer in
-      let _nscount = Iobuf.Consume.uint16_be buffer in
-      let _arcount = Iobuf.Consume.uint16_be buffer in
-      for _i = 0 to qdcount - 1 do
-        consume_domain buffer
-      done;
-      for _i = 0 to ancount - 1 do
-        consume_domain buffer;
-        let _time = Iobuf.Consume.uint32_be buffer in
-        let len = Iobuf.Consume.uint16_be buffer in
-        let rdata = Iobuf.Consume.string ~len buffer in
-        if len = 4 then
-          f (String.to_list rdata
-            |> List.map ~f:Char.to_int 
-            |> List.map ~f:Int.to_string 
-            |> String.concat ~sep:".")
-      done
-    )
-
+    Udp.read_loop (Socket.fd udp) (fun iobuf ->
+      consume_iobuf iobuf ~f)
