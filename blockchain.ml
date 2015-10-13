@@ -67,6 +67,17 @@ let process_header t (header : Header.t) ~mark_as_changed =
   end else
     Core.Std.printf "Header hash mismatch!\n%!"
 
+let write_blockchain_file t =
+  let tmp_file = sprintf "%s.tmp" t.blockchain_file in
+  Writer.with_file tmp_file ~f:(fun writer ->
+    Deferred.List.iter t.headers ~f:(fun header ->
+      Writer.write_bin_prot writer Header.bin_writer_t header;
+      Writer.flushed writer)
+  )
+  >>= fun () ->
+  Unix.rename ~src:tmp_file ~dst:t.blockchain_file
+  >>| fun () -> t.has_changed_since_last_write <- false
+
 let create ~blockchain_file ~stop =
   let t =
     { status = Not_connected
@@ -101,14 +112,8 @@ let create ~blockchain_file ~stop =
   Core.Std.printf "Read %d headers from %s.\n%!"
     (List.length t.headers) blockchain_file;
   Clock.every' ~stop (sec 30.) (fun () ->
-    if t.has_changed_since_last_write then begin
-      Writer.with_file t.blockchain_file ~f:(fun writer ->
-        Deferred.List.iter t.headers ~f:(fun header ->
-          Writer.write_bin_prot writer Header.bin_writer_t header;
-          Writer.flushed writer)
-      )
-      >>| fun () -> t.has_changed_since_last_write <- false
-    end else Deferred.unit
+    if t.has_changed_since_last_write then write_blockchain_file t
+    else Deferred.unit
   );
   t
 

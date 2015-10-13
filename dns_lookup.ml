@@ -1,21 +1,21 @@
 open Core.Std
 open Async.Std
 
-let consume_domain buffer =
+let consume_domain iobuf =
   let rec loop () =
-    let len = Iobuf.Consume.uint8 buffer in
+    let len = Iobuf.Consume.uint8 iobuf in
     if len = 0 then ()
     else if len land 192 > 0 then begin
-      let _ptr = Iobuf.Consume.uint8 buffer in
+      let _ptr = Iobuf.Consume.uint8 iobuf in
       ()
     end else begin
-      let _query = Iobuf.Consume.string ~len buffer in
+      let _query = Iobuf.Consume.string ~len iobuf in
       loop ()
     end
   in
   loop ();
-  let _qtype = Iobuf.Consume.uint16_be buffer in
-  let _qclass = Iobuf.Consume.uint16_be buffer in
+  let _qtype = Iobuf.Consume.uint16_be iobuf in
+  let _qclass = Iobuf.Consume.uint16_be iobuf in
   ()
 
 let consume_iobuf iobuf ~f =
