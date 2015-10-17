@@ -171,12 +171,12 @@ module Inv = struct
 
   type elem =
     { type_identifier : type_identifier
-    ; hash : string
+    ; hash : Hash.t
     } with sexp, fields
 
   let consume_elem iobuf =
     let type_identifier = Iobuf.Consume.uint32_le iobuf |> type_identifier_of_int in
-    let hash = Common.consume_hash iobuf in
+    let hash = Hash.consume iobuf in
     Fields_of_elem.create
       ~type_identifier
       ~hash
@@ -185,7 +185,7 @@ module Inv = struct
     let write f g = fun field -> f iobuf (Field.get field elem |> g) in
     Fields_of_elem.iter
       ~type_identifier:(write Iobuf.Fill.uint32_le int_of_type_identifier)
-      ~hash:(write Common.fill_hash Fn.id)
+      ~hash:(write Hash.fill Fn.id)
 
   type t = elem list with sexp
 
@@ -291,17 +291,15 @@ end
 module Getblocks = struct
   type t =
     { version : int
-    ; block_header_hashes : string list
-    ; stop_hash : string option
+    ; block_header_hashes : Hash.t list
+    ; stop_hash : Hash.t option
     } with sexp, fields
-
-  let zero_hash = String.of_char_list (List.init 32 ~f:(fun _ -> '\000'))
 
   let consume_iobuf iobuf =
     let version = Iobuf.Consume.uint32_le iobuf in
-    let block_header_hashes = consume_list iobuf Common.consume_hash in
-    let stop_hash = Common.consume_hash iobuf in
-    let stop_hash = if String.(=) stop_hash zero_hash then None else Some stop_hash in
+    let block_header_hashes = consume_list iobuf Hash.consume in
+    let stop_hash = Hash.consume iobuf in
+    let stop_hash = if Hash.(=) stop_hash Hash.zero then None else Some stop_hash in
     Fields.create
       ~version
       ~block_header_hashes
@@ -311,22 +309,22 @@ module Getblocks = struct
     let write f g = fun field -> f iobuf (Field.get field t |> g) in
     Fields.iter
       ~version:(write Iobuf.Fill.uint32_le Fn.id)
-      ~block_header_hashes:(write (fill_list Common.fill_hash) Fn.id)
+      ~block_header_hashes:(write (fill_list Hash.fill) Fn.id)
       ~stop_hash:(write
         (fun iobuf stop_hash ->
-          Common.fill_hash iobuf (Option.value stop_hash ~default:zero_hash))
+          Hash.fill iobuf (Option.value stop_hash ~default:Hash.zero))
         Fn.id
       )
 end
 
 module Outpoint = struct
   type t =
-    { hash : string
+    { hash : Hash.t
     ; index : int
     } with sexp, fields
 
   let consume_iobuf iobuf =
-    let hash = Common.consume_hash iobuf in
+    let hash = Hash.consume iobuf in
     let index = Iobuf.Consume.uint32_le iobuf in
     Fields.create
       ~hash
@@ -335,7 +333,7 @@ module Outpoint = struct
   let fill_iobuf iobuf t =
     let write f g = fun field -> f iobuf (Field.get field t |> g) in
     Fields.iter
-      ~hash:(write Common.fill_hash Fn.id)
+      ~hash:(write Hash.fill Fn.id)
       ~index:(write Iobuf.Fill.uint32_le Fn.id)
 end
 
@@ -459,14 +457,14 @@ module Merkleblock = struct
   type t =
     { block_header : Header.t
     ; transaction_count : int
-    ; hashes : string list
+    ; hashes : Hash.t list
     ; flags : string
     } with sexp, fields
 
   let consume_iobuf iobuf =
     let block_header = Header.consume_iobuf iobuf in
     let transaction_count = Iobuf.Consume.uint32_le iobuf in
-    let hashes = consume_list iobuf Common.consume_hash in
+    let hashes = consume_list iobuf Hash.consume in
     let flags = consume_string iobuf in
     Fields.create
       ~block_header
@@ -479,7 +477,7 @@ module Merkleblock = struct
     Fields.iter
       ~block_header:(write Header.fill_iobuf Fn.id)
       ~transaction_count:(write Iobuf.Fill.uint32_le Fn.id)
-      ~hashes:(write (fill_list Common.fill_hash) Fn.id)
+      ~hashes:(write (fill_list Hash.fill) Fn.id)
       ~flags:(write fill_string Fn.id)
 end
 

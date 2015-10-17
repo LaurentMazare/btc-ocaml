@@ -1,5 +1,6 @@
 open Core.Std
 open Async.Std
+
 module Hardcoded = struct
   (* When answering an open Getheaders query, headers message should contain 2000 headers
      except for the last message that contains less headers. *)
@@ -7,40 +8,6 @@ module Hardcoded = struct
 
   let get_more_headers_after = sec 600.
 end
-
-let hex_of_char c =
-  if Char.('0' <= c && c <= '9') then Char.to_int c - Char.to_int '0'
-  else if Char.('a' <= c && c <= 'f') then 10 + Char.to_int c - Char.to_int 'a'
-  else failwithf "char %c is not hex" c ()
-
-let char_of_hex i =
-  if 0 <= i && i < 10 then Char.of_int_exn (Char.to_int '0' + i)
-  else if 10 <= i && i < 16 then Char.of_int_exn (Char.to_int 'a' + i - 10)
-  else failwithf "not in hex range %d" i ()
-
-let of_hex str =
-  if String.is_prefix str ~prefix:"0x" then
-    let len = String.length str in
-    if len % 2 = 0 then
-      String.init (len / 2 - 1) ~f:(fun i ->
-        Char.of_int_exn
-          (16 * hex_of_char str.[len - 2*i - 2] + hex_of_char str.[len - 2*i - 1]))
-    else failwith "Input string size is odd"
-  else
-    failwith "Incorrect prefix"
-
-let to_hex str =
-  let len = String.length str in
-  let hex =
-    String.init (2*len) ~f:(fun i ->
-      let c = str.[len-1 - i / 2] |> Char.to_int in
-      if i % 2 = 0 then char_of_hex (c / 16) else char_of_hex (c % 16)
-    )
-  in
-  "0x" ^ hex
-
-let genesis_hash =
-  of_hex "0x000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
 
 module Status = struct
   type t =
@@ -52,14 +19,14 @@ end
 type t =
   { mutable status : Status.t
   ; mutable headers : Header.t list
-  ; mutable current_tip_hash : string
+  ; mutable current_tip_hash : Hash.t
   ; mutable has_changed_since_last_write : bool
   ; mutable last_batch_processed : Time.t
   ; blockchain_file : string
   } with fields
 
 let process_header t (header : Header.t) ~mark_as_changed =
-  if String.(=) header.previous_block_header_hash t.current_tip_hash then begin
+  if Hash.(=) header.previous_block_header_hash t.current_tip_hash then begin
     t.headers <- header :: t.headers;
     t.current_tip_hash <- Header.hash header;
     if mark_as_changed then
@@ -77,6 +44,9 @@ let write_blockchain_file t =
   >>= fun () ->
   Unix.rename ~src:tmp_file ~dst:t.blockchain_file
   >>| fun () -> t.has_changed_since_last_write <- false
+
+let genesis_hash =
+  Hash.of_hex "0x000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
 
 let create ~blockchain_file ~stop =
   let t =

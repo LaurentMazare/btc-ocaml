@@ -51,7 +51,7 @@ module Inv : sig
 
   type elem =
     { type_identifier : type_identifier
-    ; hash : string
+    ; hash : Hash.t
     } with sexp, fields
 
   type t = elem list with sexp
@@ -89,8 +89,8 @@ end
 module Getblocks : sig
   type t =
     { version : int
-    ; block_header_hashes : string list
-    ; stop_hash : string option
+    ; block_header_hashes : Hash.t list
+    ; stop_hash : Hash.t option
     } with sexp
 end
 
@@ -108,7 +108,7 @@ end
 
 module Outpoint : sig
   type t =
-    { hash : string
+    { hash : Hash.t
     ; index : int
     } with sexp
 end
@@ -153,7 +153,7 @@ module Merkleblock : sig
   type t =
     { block_header : Header.t
     ; transaction_count : int
-    ; hashes : string list
+    ; hashes : Hash.t list
     ; flags : string
     } with sexp
 end
@@ -188,4 +188,4 @@ val handle_chunk
 val version : unit -> t
 val to_string : t -> string
 
-val getheaders : from_hash : string -> t
+val getheaders : from_hash : Hash.t -> t

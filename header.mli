@@ -9,14 +9,14 @@ end
 
 type t =
   { version : int
-  ; previous_block_header_hash : string
-  ; merkle_root_hash : string
+  ; previous_block_header_hash : Hash.t
+  ; merkle_root_hash : Hash.t
   ; time : Time.t
   ; nbits : Nbits.t
   ; nonce : int
   } with sexp, fields, bin_io
 
-val hash : t -> string
+val hash : t -> Hash.t
 
 val consume_iobuf : ('a, Iobuf.seek) Iobuf.t -> t
 

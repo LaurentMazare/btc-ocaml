@@ -24,8 +24,8 @@ end
 
 type t =
   { version : int
-  ; previous_block_header_hash : string
-  ; merkle_root_hash : string
+  ; previous_block_header_hash : Hash.t
+  ; merkle_root_hash : Hash.t
   ; time : Time.t
   ; nbits : Nbits.t
   ; nonce : int
@@ -33,8 +33,8 @@ type t =
 
 let consume_iobuf iobuf =
   let version = Iobuf.Consume.uint32_le iobuf in
-  let previous_block_header_hash = Common.consume_hash iobuf in
-  let merkle_root_hash = Common.consume_hash iobuf in
+  let previous_block_header_hash = Hash.consume iobuf in
+  let merkle_root_hash = Hash.consume iobuf in
   let time = Iobuf.Consume.uint32_le iobuf |> float |> Time.of_float in
   let nbits = Nbits.consume iobuf in
   let nonce = Iobuf.Consume.uint32_le iobuf in
@@ -52,8 +52,8 @@ let fill_iobuf iobuf elem =
   let write f g = fun field -> f iobuf (Field.get field elem |> g) in
   Fields.iter
     ~version:(write Iobuf.Fill.uint32_le Fn.id)
-    ~previous_block_header_hash:(write Common.fill_hash Fn.id)
-    ~merkle_root_hash:(write Common.fill_hash Fn.id)
+    ~previous_block_header_hash:(write Hash.fill Fn.id)
+    ~merkle_root_hash:(write Hash.fill Fn.id)
     ~time:(write Iobuf.Fill.uint32_le (fun time -> Time.to_epoch time |> Float.to_int))
     ~nbits:(write Nbits.fill_iobuf Fn.id)
     ~nonce:(write Iobuf.Fill.uint32_le Fn.id);
@@ -71,4 +71,5 @@ let hash =
       hash1 # add_char (Iobuf.Peek.char iobuf ~pos)
     done;
     Cryptokit.hash_string (Cryptokit.Hash.sha256 ()) (hash1 # result)
+    |> Hash.of_string
 
