@@ -44,6 +44,8 @@ let write_blockchain_file t =
       Writer.flushed writer)
   )
   >>= fun () ->
+  (* The rename operation is atomic, this avoids corrupting the file if the process dies
+     while writing it. *)
   Unix.rename ~src:tmp_file ~dst:t.blockchain_file
   >>| fun () -> t.has_changed_since_last_write <- false
 
@@ -133,6 +135,17 @@ let create ~blockchain_file ~network =
   Clock.every' ~stop (sec 30.) (fun () ->
     if t.has_changed_since_last_write then write_blockchain_file t
     else Deferred.unit
+  );
+  Clock.every ~stop (sec 1.) (fun () ->
+    let connected_nodes = Network.connected_nodes t.network in
+    let connected_node_count = List.length connected_nodes in
+    if 5 <= connected_node_count && not_connected t then begin
+      List.nth_exn connected_nodes (Random.int connected_node_count)
+      |> fun node ->
+      maybe_start_syncing t (Node.address node)
+      |> Option.iter ~f:(fun (`from_hash from_hash) ->
+        Node.send node (Message.getheaders ~from_hash))
+    end
   );
   t
 

@@ -19,7 +19,8 @@ type t =
   ; mutable process_headers : (node:Node.t -> headers:Header.t list -> unit)
   }
 
-let connected_addresses t = Hashtbl.keys t.per_address
+let connected_nodes t =
+  Hashtbl.fold t.per_address ~init:[] ~f:(fun ~key:_ ~data acc -> data :: acc)
 
 let status_string = function
   | `Eof_with_unconsumed_data str ->

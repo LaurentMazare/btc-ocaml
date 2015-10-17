@@ -20,4 +20,4 @@ val add_node
 
 val close : t -> unit
 
-val connected_addresses : t -> Address.t list
+val connected_nodes : t -> Node.t list
