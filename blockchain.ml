@@ -170,7 +170,7 @@ let create ~blockchain_file ~network =
     if 10 <= connected_node_count && t.checked_len < t.header_len
     && Option.is_none t.header_check then begin
       let header_check =
-        { addresses = Address.Hash_set.create ()
+        { Header_check.addresses = Address.Hash_set.create ()
         ; hash_to_check = t.current_tip_hash
         ; hash_index = t.header_len
         ; start_time = now
