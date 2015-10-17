@@ -79,10 +79,6 @@ let genesis_hash =
 
 let process_headers t ~node ~headers =
   let address = Node.address node in
-  if Hardcoded.debug then
-    Core.Std.printf "Processing %d header(s) from %s.\n%!"
-      (List.length headers)
-      (Address.ipv4 (Node.address node) |> Option.value ~default:"<unknown>");
   match t.status with
   (* If we're currently syncing with [node], append the headers. *)
   | Syncing sync_address when Address.(=) sync_address address ->
@@ -194,7 +190,7 @@ let refresh t =
     if Hardcoded.debug then
       Core.Std.printf "Checking %s %d\n%!" (Hash.to_hex t.current_tip_hash) t.header_len;
     let header_check =
-      { Header_check.addresses = Address.Hash_set.create ()
+      { Header_check.addresses
       ; hash_to_check = t.current_tip_hash
       ; hash_len = t.header_len
       ; start_time = now
