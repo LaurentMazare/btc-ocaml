@@ -2,6 +2,7 @@ open Core.Std
 open Async.Std
 
 module Hardcoded = struct
+  let debug = true
   (* When answering an open Getheaders query, headers message should contain 2000 headers
      except for the last message that contains less headers. *)
   let max_headers = 2_000
@@ -101,7 +102,9 @@ let process_headers t ~node ~headers =
     | Some header_check, [ header ] when Hash_set.mem header_check.addresses address
           && Hash.(=) (Header.hash header) header_check.hash_to_check ->
       Hash_set.remove header_check.addresses address;
-      (* We had enough confirmations, consider this hash as confirmed. *)
+      if Hardcoded.debug then
+        Core.Std.printf "Received header confirmation.\n%!";
+      (* If we had enough confirmations consider this hash as confirmed. *)
       if Hash_set.length header_check.addresses < Hardcoded.check_nodes / 2 then begin
         t.header_check <- None;
         t.checked_len <- header_check.hash_len
@@ -136,6 +139,8 @@ let check_timeout t ~now:now_ =
   | None -> ()
   | Some header_check ->
     if Time.(add header_check.start_time Hardcoded.check_timeout <= now_) then begin
+      if Hardcoded.debug then
+        Core.Std.printf "Header check timout.\n%!";
       t.headers <- List.take t.headers t.checked_len;
       t.header_len <- t.checked_len;
       t.current_tip_hash <-
@@ -222,6 +227,8 @@ let create ~blockchain_file ~network =
           Node.send node_to_add getheaders
         end
       done;
+      if Hardcoded.debug then
+        Core.Std.printf "Checking %s %d\n%!" (Hash.to_hex t.current_tip_hash) t.header_len;
       let header_check =
         { Header_check.addresses = Address.Hash_set.create ()
         ; hash_to_check = t.current_tip_hash
