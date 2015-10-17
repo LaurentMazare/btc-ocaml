@@ -18,6 +18,15 @@ module Status = struct
     | At_tip
 end
 
+module Header_check = struct
+  type t =
+    { addresses : Address.Hash_set.t
+    ; hash_to_check : Hash.t
+    ; hash_index : int
+    ; start_time : Time.t
+    }
+end
+
 type t =
   { mutable status : Status.t
   ; mutable headers : Header.t list
@@ -27,6 +36,8 @@ type t =
   ; blockchain_file : string
   ; stop : unit Ivar.t
   ; network : Network.t
+  ; mutable header_check : Header_check.t option
+  ; mutable last_checked_index : int
   } with fields
 
 let process_header t (header : Header.t) ~mark_as_changed =
@@ -40,8 +51,9 @@ let process_header t (header : Header.t) ~mark_as_changed =
 
 let write_blockchain_file t =
   let tmp_file = sprintf "%s.tmp" t.blockchain_file in
+  let headers = List.rev t.headers in
   Writer.with_file tmp_file ~f:(fun writer ->
-    Deferred.List.iter t.headers ~f:(fun header ->
+    Deferred.List.iter headers ~f:(fun header ->
       Writer.write_bin_prot writer Header.bin_writer_t header;
       Writer.flushed writer)
   )
@@ -83,10 +95,15 @@ let need_syncing t ~now:now_ =
     Time.(add t.last_batch_processed Hardcoded.get_more_headers_after <= now_)
 
 let sync_timeout t ~now:now_ =
-  match t.status with
-  | Not_connected | At_tip -> false
-  | Syncing _ ->
-    Time.(add t.last_batch_processed Hardcoded.node_timeout <= now_)
+  let timeout =
+    match t.status with
+    | Not_connected | At_tip -> false
+    | Syncing _ ->
+      Time.(add t.last_batch_processed Hardcoded.node_timeout <= now_)
+  in
+  if timeout then
+    (* Maybe remove/blacklist the host ? *)
+    t.status <- Not_connected
 
 let start_syncing t node =
   t.status <- Syncing (Node.address node);
@@ -106,6 +123,8 @@ let create ~blockchain_file ~network =
     ; last_batch_processed = Time.epoch
     ; stop
     ; network
+    ; header_check = None
+    ; last_checked_index = -1
     }
   in
   Network.set_callbacks network ~process_headers:(process_headers t);
@@ -115,21 +134,20 @@ let create ~blockchain_file ~network =
     match file_exists with
     | `Yes ->
       Reader.with_file blockchain_file ~f:(fun reader ->
-        let rec loop acc =
+        let rec loop () =
           Reader.read_bin_prot reader Header.bin_reader_t
           >>= function
           | `Eof ->
-            return acc
+            Deferred.unit
           | `Ok header ->
-            loop (header :: acc)
+            process_header t header ~mark_as_changed:false;
+            loop ()
         in
-        loop []
+        loop ()
       )
-    | `No | `Unknown -> return []
+    | `No | `Unknown -> Deferred.unit
   end
-  >>| fun headers ->
-  List.iter headers ~f:(fun header ->
-    process_header t header ~mark_as_changed:false);
+  >>| fun () ->
   Core.Std.printf "Read %d headers from %s.\n%!"
     (List.length t.headers) blockchain_file;
   let stop = Ivar.read stop in
@@ -139,9 +157,7 @@ let create ~blockchain_file ~network =
   );
   Clock.every ~stop (sec 1.) (fun () ->
     let now = Time.now () in
-    if sync_timeout t ~now then
-      (* Maybe remove/blacklist the host ? *)
-      t.status <- Not_connected;
+    sync_timeout t ~now;
     let connected_nodes = Network.connected_nodes t.network in
     let connected_node_count = List.length connected_nodes in
     if 5 <= connected_node_count && need_syncing t ~now then begin
