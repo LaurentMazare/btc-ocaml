@@ -18,6 +18,6 @@ type t =
 
 val hash : t -> Hash.t
 
-val consume_iobuf : ('a, Iobuf.seek) Iobuf.t -> t
+val consume_iobuf : ([> read], Iobuf.seek) Iobuf.t -> t
 
 val fill_iobuf : (read_write, Iobuf.seek) Iobuf.t -> t -> unit

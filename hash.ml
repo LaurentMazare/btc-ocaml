@@ -35,7 +35,7 @@ include String
 
 let consume iobuf = Iobuf.Consume.string iobuf ~len:32
 
-let fill iobuf str = Iobuf.Fill.padded_fixed_string iobuf str ~len:32 ~padding:'\000'
+let fill iobuf str = Iobuf.Fill.tail_padded_fixed_string iobuf str ~len:32 ~padding:'\000'
 
 let zero = String.of_char_list (List.init 32 ~f:(fun _ -> '\000'))
 

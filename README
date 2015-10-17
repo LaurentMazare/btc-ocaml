@@ -6,10 +6,10 @@ Note that this is very experimental so bugs should be expected and in particular
 2. Building
 -----------
 btc-ocaml can be built using opam on a linux platform as follows.
-  A. Install the following dependencies using opam as well as ocaml 4.01:
+  A. Install the following dependencies using opam as well as ocaml 4.02.2:
     - cryptokit (1.10)
-    - core (111.28.01)
-    - async (111.25.00)
+    - core (113.00.00)
+    - async (113.00.00)
   B. Build btc.native via the following command line:
     corebuild btc.native -pkgs core -pkgs async -pkgs cryptokit
 

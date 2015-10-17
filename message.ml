@@ -78,10 +78,10 @@ module Version = struct
       ~services:(write Iobuf.Fill.int64_t_le Fn.id)
       ~timestamp:(write Iobuf.Fill.int64_le (fun time -> Time.to_epoch time |> Float.to_int))
       ~addr_recv_services:(write Iobuf.Fill.int64_t_le Fn.id)
-      ~addr_recv_addr:(write (Iobuf.Fill.padded_fixed_string ~padding:'\000' ~len:16) Address.to_string)
+      ~addr_recv_addr:(write (Iobuf.Fill.tail_padded_fixed_string ~padding:'\000' ~len:16) Address.to_string)
       ~addr_recv_port:(write Iobuf.Fill.int16_be Fn.id)
       ~addr_trans_services:(write Iobuf.Fill.int64_t_le Fn.id)
-      ~addr_trans_addr:(write (Iobuf.Fill.padded_fixed_string ~padding:'\000' ~len:16) Address.to_string)
+      ~addr_trans_addr:(write (Iobuf.Fill.tail_padded_fixed_string ~padding:'\000' ~len:16) Address.to_string)
       ~addr_trans_port:(write Iobuf.Fill.int16_be Fn.id)
       ~nonce:(write Iobuf.Fill.int64_t_le Fn.id)
       ~user_agent:(write fill_string Fn.id)
@@ -143,7 +143,7 @@ module Addr = struct
     Fields_of_elem.iter
       ~time:(write Iobuf.Fill.uint32_le (fun time -> Time.to_epoch time |> Float.to_int))
       ~services:(write Iobuf.Fill.int64_t_le Fn.id)
-      ~ip_address:(write (Iobuf.Fill.padded_fixed_string ~padding:'\000' ~len:16) Address.to_string)
+      ~ip_address:(write (Iobuf.Fill.tail_padded_fixed_string ~padding:'\000' ~len:16) Address.to_string)
       ~port:(write Iobuf.Fill.int16_be Fn.id)
 
   type t = elem list with sexp
@@ -555,7 +555,7 @@ let to_string t =
   (* Magic number. *)
   Iobuf.Fill.uint32_be shared_iobuf 0xf9beb4d9;
   (* Message type. *)
-  Iobuf.Fill.padded_fixed_string shared_iobuf (command_name t) ~padding:'\000' ~len:12;
+  Iobuf.Fill.tail_padded_fixed_string shared_iobuf (command_name t) ~padding:'\000' ~len:12;
   (* Payload size, unknown for now. *)
   Iobuf.Fill.uint32_le shared_iobuf 0;
   (* Checksum, unknown for now. *)
@@ -601,7 +601,7 @@ let getheaders ~from_hash ~stop_hash =
 
 let handle_msg bigstring ~pos ~payload_len ~f =
   let command_name =
-    Bigstring.get_padded_fixed_string bigstring ~padding:'\000' ~len:12 ~pos:(pos + 4) ()
+    Bigstring.get_tail_padded_fixed_string bigstring ~padding:'\000' ~len:12 ~pos:(pos + 4) ()
   in
   let msg =
     let payload = Iobuf.of_bigstring bigstring ~pos:(pos + header_len) ~len:payload_len in
