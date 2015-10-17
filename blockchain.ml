@@ -154,6 +154,50 @@ let check_timeout t ~now:now_ =
 let close t =
   Ivar.fill_if_empty t.stop ()
 
+let refresh t =
+  let now = Time.now () in
+  sync_timeout t ~now;
+  check_timeout t ~now;
+  let connected_nodes = Network.connected_nodes t.network in
+  let connected_node_count = List.length connected_nodes in
+  if 5 <= connected_node_count && need_syncing t ~now then begin
+    List.nth_exn connected_nodes (Random.int connected_node_count)
+    |> fun node -> start_syncing t node
+  end;
+  if Hardcoded.check_nodes + 1 <= connected_node_count && t.checked_len < t.header_len
+  && Option.is_none t.header_check then begin
+    let addresses = Address.Hash_set.create () in
+    let getheaders =
+      Message.getheaders
+        ~from_hash:t.current_tip_hash
+        ~stop_hash:(Some t.current_tip_hash)
+    in
+    (* Use some Fisher-Yates sampling to get some distinct random nodes. *)
+    let connected_nodes = Array.of_list connected_nodes in
+    for i = 0 to Hardcoded.check_nodes do
+      let rnd_i = Random.int (connected_node_count - i) in
+      let rnd_node = connected_nodes.(rnd_i) in
+      connected_nodes.(rnd_i) <- connected_nodes.(i);
+      connected_nodes.(i) <- rnd_node;
+      let address = Node.address rnd_node in
+      match t.status with
+      | Syncing sync_address when Address.(=) sync_address address -> ()
+      | _ ->
+        Hash_set.add addresses address;
+        Node.send rnd_node getheaders
+    done;
+    if Hardcoded.debug then
+      Core.Std.printf "Checking %s %d\n%!" (Hash.to_hex t.current_tip_hash) t.header_len;
+    let header_check =
+      { Header_check.addresses = Address.Hash_set.create ()
+      ; hash_to_check = t.current_tip_hash
+      ; hash_len = t.header_len
+      ; start_time = now
+      }
+    in
+    t.header_check <- Some header_check
+  end
+
 let create ~blockchain_file ~network =
   let stop = Ivar.create () in
   let t =
@@ -198,45 +242,5 @@ let create ~blockchain_file ~network =
     if t.has_changed_since_last_write then write_blockchain_file t
     else Deferred.unit
   );
-  Clock.every ~stop (sec 1.) (fun () ->
-    let now = Time.now () in
-    sync_timeout t ~now;
-    let connected_nodes = Network.connected_nodes t.network in
-    let connected_node_count = List.length connected_nodes in
-    if 5 <= connected_node_count && need_syncing t ~now then begin
-      List.nth_exn connected_nodes (Random.int connected_node_count)
-      |> fun node -> start_syncing t node
-    end;
-    if Hardcoded.check_nodes + 1 <= connected_node_count && t.checked_len < t.header_len
-    && Option.is_none t.header_check then begin
-      let addresses = Address.Hash_set.create () in
-      let getheaders =
-        Message.getheaders
-          ~from_hash:t.current_tip_hash
-          ~stop_hash:(Some t.current_tip_hash)
-      in
-      while Hash_set.length addresses < Hardcoded.check_nodes do
-        (* TODO: check that address is different from the current sync address
-           and use Fisher-Yates for sampling. *)
-        let node_to_add =
-          List.nth_exn connected_nodes (Random.int connected_node_count)
-        in
-        let address = Node.address node_to_add in
-        if not (Hash_set.mem addresses address) then begin
-          Hash_set.add addresses address;
-          Node.send node_to_add getheaders
-        end
-      done;
-      if Hardcoded.debug then
-        Core.Std.printf "Checking %s %d\n%!" (Hash.to_hex t.current_tip_hash) t.header_len;
-      let header_check =
-        { Header_check.addresses = Address.Hash_set.create ()
-        ; hash_to_check = t.current_tip_hash
-        ; hash_len = t.header_len
-        ; start_time = now
-        }
-      in
-      t.header_check <- Some header_check
-    end
-  );
+  Clock.every ~stop (sec 1.) (fun () -> refresh t);
   t

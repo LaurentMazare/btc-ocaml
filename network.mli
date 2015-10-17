@@ -9,7 +9,7 @@ val create
 
 val set_callbacks
   :  t
-  ->  process_headers : (node:Node.t -> headers:Header.t list -> unit)
+  -> process_headers : (node:Node.t -> headers:Header.t list -> unit)
   -> unit
 
 val add_node
