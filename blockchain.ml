@@ -7,6 +7,8 @@ module Hardcoded = struct
   let max_headers = 2_000
 
   let get_more_headers_after = sec 600.
+
+  let node_timeout = sec 60.
 end
 
 module Status = struct
@@ -73,23 +75,22 @@ let process_headers t ~node ~headers =
       Node.send node (Message.getheaders ~from_hash:t.current_tip_hash)
   | Syncing _ | Not_connected | At_tip -> ()
 
-let not_connected t =
+let need_syncing t ~now:now_ =
   match t.status with
   | Not_connected -> true
-  | Syncing _ | At_tip -> false
+  | Syncing _ -> false
+  | At_tip ->
+    Time.(add t.last_batch_processed Hardcoded.get_more_headers_after <= now_)
 
-let maybe_start_syncing t node =
-  let start_syncing =
-    match t.status with
-    | Syncing _ -> false
-    | Not_connected -> true
-    | At_tip ->
-      Time.(add t.last_batch_processed Hardcoded.get_more_headers_after <= now ())
-  in
-  if start_syncing then begin
-    t.status <- Syncing node;
-    Some (`from_hash t.current_tip_hash)
-  end else None
+let sync_timeout t ~now:now_ =
+  match t.status with
+  | Not_connected | At_tip -> false
+  | Syncing _ ->
+    Time.(add t.last_batch_processed Hardcoded.node_timeout <= now_)
+
+let start_syncing t node =
+  t.status <- Syncing (Node.address node);
+  Node.send node (Message.getheaders ~from_hash:t.current_tip_hash)
 
 let close t =
   Ivar.fill_if_empty t.stop ()
@@ -137,16 +138,15 @@ let create ~blockchain_file ~network =
     else Deferred.unit
   );
   Clock.every ~stop (sec 1.) (fun () ->
+    let now = Time.now () in
+    if sync_timeout t ~now then
+      (* Maybe remove/blacklist the host ? *)
+      t.status <- Not_connected;
     let connected_nodes = Network.connected_nodes t.network in
     let connected_node_count = List.length connected_nodes in
-    if 5 <= connected_node_count && not_connected t then begin
+    if 5 <= connected_node_count && need_syncing t ~now then begin
       List.nth_exn connected_nodes (Random.int connected_node_count)
-      |> fun node ->
-      maybe_start_syncing t (Node.address node)
-      |> Option.iter ~f:(fun (`from_hash from_hash) ->
-        Node.send node (Message.getheaders ~from_hash))
+      |> fun node -> start_syncing t node
     end
   );
   t
-
-
