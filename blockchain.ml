@@ -24,7 +24,7 @@ module Header_check = struct
   type t =
     { addresses : Address.Hash_set.t
     ; hash_to_check : Hash.t
-    ; hash_index : int
+    ; hash_len : int
     ; start_time : Time.t
     }
 end
@@ -73,6 +73,7 @@ let genesis_hash =
 let process_headers t ~node ~headers =
   let address = Node.address node in
   match t.status with
+  (* If we're currently syncing with [node], append the headers. *)
   | Syncing sync_address when Address.(=) sync_address address ->
     t.last_batch_processed <- Time.now ();
     let headers_len = List.length headers in
@@ -89,7 +90,18 @@ let process_headers t ~node ~headers =
     if at_tip then ()
     else
       Node.send node (Message.getheaders ~from_hash:t.current_tip_hash ~stop_hash:None)
-  | Syncing _ | Not_connected | At_tip -> ()
+  | Syncing _ | Not_connected | At_tip ->
+    match t.header_check, headers with
+    | Some header_check, [ header ] when Hash_set.mem header_check.addresses address
+          && Hash.(=) (Header.hash header) header_check.hash_to_check ->
+      Hash_set.remove header_check.addresses address;
+      (* We had enough confirmations, consider this hash as confirmed. *)
+      if Hash_set.length header_check.addresses < Hardcoded.check_nodes / 2 then begin
+        t.header_check <- None;
+        t.checked_len <- header_check.hash_len
+      end
+    (* Discard this message. *)
+    | _ -> ()
 
 let need_syncing t ~now:now_ =
   match t.status with
@@ -178,10 +190,11 @@ let create ~blockchain_file ~network =
           ~stop_hash:(Some t.current_tip_hash)
       in
       while Hash_set.length addresses < Hardcoded.check_nodes do
+        (* TODO: check that address is different from the current sync address
+           and use Fisher-Yates for sampling. *)
         let node_to_add =
           List.nth_exn connected_nodes (Random.int connected_node_count)
         in
-        (* TODO: check that address is different from the current sync address. *)
         let address = Node.address node_to_add in
         if not (Hash_set.mem addresses address) then begin
           Hash_set.add addresses address;
@@ -191,7 +204,7 @@ let create ~blockchain_file ~network =
       let header_check =
         { Header_check.addresses = Address.Hash_set.create ()
         ; hash_to_check = t.current_tip_hash
-        ; hash_index = t.header_len
+        ; hash_len = t.header_len
         ; start_time = now
         }
       in
