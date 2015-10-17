@@ -18,14 +18,16 @@ let () =
         ~doc:"FILE file to load/store the blockchain headers from."
     )
     (fun blockchain_file () ->
-      Network.create ~blockchain_file
+      Network.create ()
       >>= fun network ->
+      Blockchain.create ~blockchain_file ~network
+      >>= fun blockchain ->
       Deferred.List.iter dns_domains ~f:(fun domain ->
         Dns_lookup.query ~dns_server ~domain ~f:(fun ipv4_address ->
           Network.add_node network ~ipv4_address ~port:8333)
       )
       >>= fun () ->
       Deferred.never ()
-      >>| fun () -> Network.close network
+      >>| fun () -> Blockchain.close blockchain
     )
   |> fun cmd -> Command.run cmd

@@ -12,7 +12,11 @@ let fill_string iobuf str =
  
 let consume_list iobuf consume_elem =
   let len = Common.consume_compact_uint iobuf in
-  List.init len ~f:(fun _ -> consume_elem iobuf)
+  let rec loop acc = function
+    | 0 -> acc
+    | n -> loop (consume_elem iobuf :: acc) (n-1)
+  in
+  List.rev (loop [] len)
 
 let fill_list fill_elem iobuf list =
   Common.fill_compact_uint iobuf (List.length list);

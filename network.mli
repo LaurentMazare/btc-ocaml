@@ -4,8 +4,13 @@ open Async.Std
 type t
 
 val create
-  :  blockchain_file : string
+  :  unit
   -> t Deferred.t
+
+val set_callbacks
+  :  t
+  ->  process_headers : (node:Node.t -> headers:Header.t list -> unit)
+  -> unit
 
 val add_node
   :  t
@@ -14,3 +19,5 @@ val add_node
   -> unit
 
 val close : t -> unit
+
+val connected_addresses : t -> Address.t list

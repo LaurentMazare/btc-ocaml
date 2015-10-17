@@ -13,44 +13,13 @@ module Hardcoded = struct
   let debug = false
 end
 
-module Node = struct
-  module Status = struct
-    type connected =
-      { services : Int64.t
-      ; send : Message.t -> unit
-      ; port : int
-      }
-    type t =
-      | Connected of connected
-      | Pending
-  end
-  
-  type t =
-    { mutable last_seen : Time.t
-    ; address : Address.t
-    ; interrupt : unit Ivar.t
-    ; mutable status : Status.t
-    }
-  
-  let create ~address =
-    { last_seen = Time.now ()
-    ; address
-    ; status = Pending
-    ; interrupt = Ivar.create ()
-    }
-
-  let send t msg =
-    match t.status with
-    | Pending -> ()
-    | Connected connected -> connected.send msg
-
-end
-
 type t =
   { per_address : Node.t Address.Table.t
   ; interrupt : unit Ivar.t
-  ; blockchain : Blockchain.t
+  ; mutable process_headers : (node:Node.t -> headers:Header.t list -> unit)
   }
+
+let connected_addresses t = Hashtbl.keys t.per_address
 
 let status_string = function
   | `Eof_with_unconsumed_data str ->
@@ -58,16 +27,11 @@ let status_string = function
   | `Eof -> "Received eof."
   | `Stopped () -> assert false
 
-let process_headers t node headers =
-  match Blockchain.process_headers t.blockchain node.Node.address (List.rev headers) with
-  | `nothing -> ()
-  | `get_headers_from from_hash -> Node.send node (Message.getheaders ~from_hash)
-
 let rec handle_connection t (node : Node.t) reader writer =
   let log str ~now =
     Core.Std.printf "%s: %s %s\n%!"
       (Time.to_string now)
-      (Address.ipv4 node.address |> Option.value ~default:"")
+      (Address.ipv4 (Node.address node) |> Option.value ~default:"")
       str
   in
   let send t =
@@ -90,7 +54,7 @@ let rec handle_connection t (node : Node.t) reader writer =
           ; port = Message.Version.addr_trans_port version
           }
         in
-        node.status <- Node.Status.Connected status;
+        Node.set_status node (Node.Status.Connected status);
         send Message.Verack
       | Ping ping -> send (Message.Pong { Message.Pong.nonce = Message.Ping.nonce ping })
       | Addr addrs ->
@@ -101,14 +65,14 @@ let rec handle_connection t (node : Node.t) reader writer =
       | Getaddr ->
         let addrs =
           Hashtbl.fold t.per_address ~init:[] ~f:(fun ~key:_ ~data acc ->
-            match data.status with
+            match Node.status data with
             | Pending -> acc
             | Connected connected ->
               let addr =
                 Message.Addr.Fields_of_elem.create
-                  ~time:data.last_seen
+                  ~time:(Node.last_seen data)
                   ~services:connected.services
-                  ~ip_address:data.address
+                  ~ip_address:(Node.address data)
                   ~port:connected.port
               in
               addr :: acc
@@ -119,7 +83,7 @@ let rec handle_connection t (node : Node.t) reader writer =
       | Inv _invs -> ()
       | Getheaders _ -> ()
       | Getblocks _ -> ()
-      | Headers headers -> process_headers t node headers
+      | Headers headers -> t.process_headers ~node ~headers:(List.rev headers)
       | Notfound _ -> ()
       | Getdata _ -> ()
       | Tx _ -> ()
@@ -128,7 +92,7 @@ let rec handle_connection t (node : Node.t) reader writer =
       | Merkleblock _ -> ()
       | Reject reject ->
         log (sprintf "reject %s" (Message.Reject.sexp_of_t reject |> Sexp.to_string)) ~now
-      | Pong _ -> node.last_seen <- now
+      | Pong _ -> Node.set_last_seen node now
   in
   send (Message.version ());
   Reader.read_one_chunk_at_a_time reader
@@ -137,13 +101,13 @@ let rec handle_connection t (node : Node.t) reader writer =
       return (`Consumed (consumed, `Need_unknown)))
   >>| fun status ->
   log (status_string status) ~now:(Time.now ());
-  Ivar.fill_if_empty node.interrupt ();
-  Hashtbl.remove t.per_address node.address
+  Ivar.fill_if_empty (Node.interrupt node) ();
+  Hashtbl.remove t.per_address (Node.address node)
 and connect t node ~port =
   let interrupt =
     Deferred.any
       [ Ivar.read t.interrupt
-      ; Ivar.read node.Node.interrupt
+      ; Ivar.read (Node.interrupt node)
       ]
   in
   let handle_connection _ reader writer =
@@ -151,7 +115,7 @@ and connect t node ~port =
     handle_connection t node reader writer
   in
   (* TODO: support ipv6. *)
-  Option.value_map (Address.ipv4 node.address)
+  Option.value_map (Address.ipv4 (Node.address node))
     ~default:Deferred.unit
     ~f:(fun ipv4 ->
       Tcp.with_connection (Tcp.to_host_and_port ipv4 port) handle_connection ~interrupt)
@@ -170,15 +134,15 @@ let refresh t =
   let now = Time.now () in
   let to_remove =
     Hashtbl.fold t.per_address ~init:[] ~f:(fun ~key ~data acc ->
-      let last_seen = Time.diff now data.last_seen in
+      let last_seen = Time.diff now (Node.last_seen data) in
       let drop =
         Time.Span.(<) Hardcoded.drop_last_seen_older_than last_seen ||
-        match data.status with
+        match Node.status data with
         | Pending -> Time.Span.(<) Hardcoded.drop_pending_older_than last_seen
         | Connected _ -> false
       in
       if drop then begin
-        Ivar.fill_if_empty data.interrupt ();
+        Ivar.fill_if_empty (Node.interrupt data) ();
         key :: acc
       end else begin
         if Time.Span.(<) Hardcoded.send_ping_after last_seen then
@@ -189,7 +153,7 @@ let refresh t =
   List.iter to_remove ~f:(Hashtbl.remove t.per_address);
   let connected_nodes =
     Hashtbl.fold t.per_address ~init:[] ~f:(fun ~key:_ ~data acc ->
-      match data.status with
+      match Node.status data with
       | Pending -> acc
       | Connected _connected -> data :: acc
     )
@@ -199,28 +163,19 @@ let refresh t =
     List.nth_exn connected_nodes (Random.int connected_node_count)
     |> fun node -> Node.send node Message.Getaddr
   end;
-  if (* Hardcoded.min_nodes *) 5 <= connected_node_count && Blockchain.not_connected t.blockchain then begin
-    List.nth_exn connected_nodes (Random.int connected_node_count)
-    |> fun node ->
-    Blockchain.maybe_start_syncing t.blockchain node.address
-    |> Option.iter ~f:(fun (`from_hash from_hash) ->
-        Node.send node (Message.getheaders ~from_hash)
-    )
-  end;
   Core.Std.printf "%s: %d/%d node(s).\n%!"
     (Time.to_string (Time.now ()))
     connected_node_count
     (Hashtbl.length t.per_address)
 
-let create ~blockchain_file =
+let create () =
   let interrupt = Ivar.create () in
   let stop = Ivar.read interrupt in
-  Blockchain.create ~blockchain_file ~stop
-  >>= fun blockchain ->
+  let process_headers ~node:_ ~headers:_ = () in
   let t =
     { per_address = Address.Table.create ()
     ; interrupt
-    ; blockchain
+    ; process_headers
     }
   in
   Clock.every ~stop Hardcoded.refresh_span (fun () -> refresh t);
@@ -240,6 +195,9 @@ let create ~blockchain_file =
     )
   >>| fun (_ : (_, _) Tcp.Server.t) ->
   t
+
+let set_callbacks t ~process_headers =
+  t.process_headers <- process_headers
 
 let add_node t ~ipv4_address ~port =
   Option.iter (Address.of_ipv4 ipv4_address) ~f:(fun address ->
