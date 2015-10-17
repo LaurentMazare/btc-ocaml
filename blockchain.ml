@@ -8,9 +8,15 @@ module Hardcoded = struct
 
   let get_more_headers_after = sec 600.
 
-  let node_timeout = sec 60.
+  (* If we haven't heard about the sync node while syncing in this span, try with another
+     sync node. *)
+  let sync_node_timeout = sec 60.
 
+  (* The number of nodes to be queried to check if a header is in the consensus
+     blockchain. At least half of the nodes have to answer before the timeout so that we
+     do not reject this header. *)
   let check_nodes = 10
+  let check_timeout = sec 60.
 end
 
 module Status = struct
@@ -115,7 +121,7 @@ let sync_timeout t ~now:now_ =
     match t.status with
     | Not_connected | At_tip -> false
     | Syncing _ ->
-      Time.(add t.last_batch_processed Hardcoded.node_timeout <= now_)
+      Time.(add t.last_batch_processed Hardcoded.sync_node_timeout <= now_)
   in
   if timeout then
     (* Maybe remove/blacklist the host ? *)
@@ -124,6 +130,21 @@ let sync_timeout t ~now:now_ =
 let start_syncing t node =
   t.status <- Syncing (Node.address node);
   Node.send node (Message.getheaders ~from_hash:t.current_tip_hash ~stop_hash:None)
+
+let check_timeout t ~now:now_ =
+  match t.header_check with
+  | None -> ()
+  | Some header_check ->
+    if Time.(add header_check.start_time Hardcoded.check_timeout <= now_) then begin
+      t.headers <- List.take t.headers t.checked_len;
+      t.header_len <- t.checked_len;
+      t.current_tip_hash <-
+        Option.value_map (List.hd t.headers) ~default:genesis_hash ~f:Header.hash;
+      t.has_changed_since_last_write <- true;
+      t.header_check <- None;
+      (* Maybe remove/blacklist the host ? *)
+      t.status <- Not_connected;
+    end
 
 let close t =
   Ivar.fill_if_empty t.stop ()
