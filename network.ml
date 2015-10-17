@@ -20,7 +20,10 @@ type t =
   }
 
 let connected_nodes t =
-  Hashtbl.fold t.per_address ~init:[] ~f:(fun ~key:_ ~data acc -> data :: acc)
+  Hashtbl.fold t.per_address ~init:[] ~f:(fun ~key:_ ~data acc ->
+    match Node.status data with
+    | Connected _ -> data :: acc
+    | Pending -> acc)
 
 let status_string = function
   | `Eof_with_unconsumed_data str ->

@@ -79,6 +79,10 @@ let genesis_hash =
 
 let process_headers t ~node ~headers =
   let address = Node.address node in
+  if Hardcoded.debug then
+    Core.Std.printf "Processing %d header(s) from %s.\n%!"
+      (List.length headers)
+      (Address.ipv4 (Node.address node) |> Option.value ~default:"<unknown>");
   match t.status with
   (* If we're currently syncing with [node], append the headers. *)
   | Syncing sync_address when Address.(=) sync_address address ->
@@ -167,9 +171,10 @@ let refresh t =
   if Hardcoded.check_nodes + 1 <= connected_node_count && t.checked_len < t.header_len
   && Option.is_none t.header_check then begin
     let addresses = Address.Hash_set.create () in
+    let prev_header = (List.hd_exn t.headers).previous_block_header_hash in
     let getheaders =
       Message.getheaders
-        ~from_hash:t.current_tip_hash
+        ~from_hash:prev_header
         ~stop_hash:(Some t.current_tip_hash)
     in
     (* Use some Fisher-Yates sampling to get some distinct random nodes. *)
