@@ -2,7 +2,7 @@ open Core.Std
 open Async.Std
 
 module Hardcoded = struct
-  let debug = true
+  let debug = false
   (* When answering an open Getheaders query, headers message should contain 2000 headers
      except for the last message that contains less headers. *)
   let max_headers = 2_000
@@ -93,7 +93,8 @@ let process_headers t ~node ~headers =
       if headers_len_post = headers_len + headers_len_pre then
         t.status <- At_tip;
     end;
-    Core.Std.printf "New blockchain length: %d\n%!" (List.length t.headers);
+    if Hardcoded.debug then
+      Core.Std.printf "New blockchain length: %d\n%!" (List.length t.headers);
     if at_tip then ()
     else
       Node.send node (Message.getheaders ~from_hash:t.current_tip_hash ~stop_hash:None)
@@ -240,6 +241,7 @@ let create ~blockchain_file ~network =
     t.header_len blockchain_file;
   let stop = Ivar.read stop in
   Clock.every' ~stop (sec 30.) (fun () ->
+    Core.Std.printf "Current blockchain length: %d, verified %d\n%!" t.header_len t.checked_len;
     if t.has_changed_since_last_write then write_blockchain_file t
     else Deferred.unit
   );
