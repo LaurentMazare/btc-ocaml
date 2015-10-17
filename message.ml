@@ -592,11 +592,11 @@ let version () =
     ; relay = 0
     }
 
-let getheaders ~from_hash =
+let getheaders ~from_hash ~stop_hash =
   Getheaders
     { Getblocks.version = protocol_version
     ; block_header_hashes = [ from_hash ]
-    ; stop_hash = None
+    ; stop_hash
     }
 
 let handle_msg bigstring ~pos ~payload_len ~f =

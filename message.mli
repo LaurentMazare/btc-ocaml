@@ -188,4 +188,4 @@ val handle_chunk
 val version : unit -> t
 val to_string : t -> string
 
-val getheaders : from_hash : Hash.t -> t
+val getheaders : from_hash:Hash.t -> stop_hash:Hash.t option -> t

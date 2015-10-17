@@ -169,18 +169,23 @@ let create ~blockchain_file ~network =
       List.nth_exn connected_nodes (Random.int connected_node_count)
       |> fun node -> start_syncing t node
     end;
-    if check_nodes + 1 <= connected_node_count && t.checked_len < t.header_len
+    if Hardcoded.check_nodes + 1 <= connected_node_count && t.checked_len < t.header_len
     && Option.is_none t.header_check then begin
       let addresses = Address.Hash_set.create () in
-      while Hash_set.length addresses < check_nodes do
+      let getheaders =
+        Message.getheaders
+          ~from_hash:t.current_tip_hash
+          ~stop_hash:(Some t.current_tip_hash)
+      in
+      while Hash_set.length addresses < Hardcoded.check_nodes do
         let node_to_add =
           List.nth_exn connected_nodes (Random.int connected_node_count)
         in
         (* TODO: check that address is different from the current sync address. *)
         let address = Node.address node_to_add in
-        if not (Hash_Set.mem addresses address) then begin
+        if not (Hash_set.mem addresses address) then begin
           Hash_set.add addresses address;
-          Node.send node (Message.getheaders ~from_hash:t.current_tip_hash)
+          Node.send node_to_add getheaders
         end
       done;
       let header_check =
