@@ -58,7 +58,12 @@ let process_header t (header : Header.t) ~mark_as_changed =
     if mark_as_changed then
       t.has_changed_since_last_write <- true;
   end else
-    Core.Std.printf "Header hash mismatch!\n%!"
+    Core.Std.printf
+      "Header current tip hash mismatch on block %d!\n  tip: %s\n  got: %s\n  nxt: %s\n%!"
+      t.header_len
+      (Hash.to_hex t.current_tip_hash)
+      (Hash.to_hex header.previous_block_header_hash)
+      (Hash.to_hex (Header.hash header))
 
 let write_blockchain_file t =
   let tmp_file = sprintf "%s.tmp" t.blockchain_file in
