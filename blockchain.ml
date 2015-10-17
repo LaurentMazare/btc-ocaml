@@ -9,6 +9,8 @@ module Hardcoded = struct
   let get_more_headers_after = sec 600.
 
   let node_timeout = sec 60.
+
+  let check_nodes = 10
 end
 
 module Status = struct
@@ -86,7 +88,7 @@ let process_headers t ~node ~headers =
     Core.Std.printf "New blockchain length: %d\n%!" (List.length t.headers);
     if at_tip then ()
     else
-      Node.send node (Message.getheaders ~from_hash:t.current_tip_hash)
+      Node.send node (Message.getheaders ~from_hash:t.current_tip_hash ~stop_hash:None)
   | Syncing _ | Not_connected | At_tip -> ()
 
 let need_syncing t ~now:now_ =
@@ -109,7 +111,7 @@ let sync_timeout t ~now:now_ =
 
 let start_syncing t node =
   t.status <- Syncing (Node.address node);
-  Node.send node (Message.getheaders ~from_hash:t.current_tip_hash)
+  Node.send node (Message.getheaders ~from_hash:t.current_tip_hash ~stop_hash:None)
 
 let close t =
   Ivar.fill_if_empty t.stop ()
@@ -167,8 +169,20 @@ let create ~blockchain_file ~network =
       List.nth_exn connected_nodes (Random.int connected_node_count)
       |> fun node -> start_syncing t node
     end;
-    if 10 <= connected_node_count && t.checked_len < t.header_len
+    if check_nodes + 1 <= connected_node_count && t.checked_len < t.header_len
     && Option.is_none t.header_check then begin
+      let addresses = Address.Hash_set.create () in
+      while Hash_set.length addresses < check_nodes do
+        let node_to_add =
+          List.nth_exn connected_nodes (Random.int connected_node_count)
+        in
+        (* TODO: check that address is different from the current sync address. *)
+        let address = Node.address node_to_add in
+        if not (Hash_Set.mem addresses address) then begin
+          Hash_set.add addresses address;
+          Node.send node (Message.getheaders ~from_hash:t.current_tip_hash)
+        end
+      done;
       let header_check =
         { Header_check.addresses = Address.Hash_set.create ()
         ; hash_to_check = t.current_tip_hash
