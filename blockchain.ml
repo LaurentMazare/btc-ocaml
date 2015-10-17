@@ -30,6 +30,7 @@ end
 type t =
   { mutable status : Status.t
   ; mutable headers : Header.t list
+  ; mutable header_len : int
   ; mutable current_tip_hash : Hash.t
   ; mutable has_changed_since_last_write : bool
   ; mutable last_batch_processed : Time.t
@@ -37,12 +38,13 @@ type t =
   ; stop : unit Ivar.t
   ; network : Network.t
   ; mutable header_check : Header_check.t option
-  ; mutable last_checked_index : int
+  ; mutable checked_len : int
   } with fields
 
 let process_header t (header : Header.t) ~mark_as_changed =
   if Hash.(=) header.previous_block_header_hash t.current_tip_hash then begin
     t.headers <- header :: t.headers;
+    t.header_len <- 1 + t.header_len;
     t.current_tip_hash <- Header.hash header;
     if mark_as_changed then
       t.has_changed_since_last_write <- true;
@@ -117,6 +119,7 @@ let create ~blockchain_file ~network =
   let t =
     { status = Not_connected
     ; headers = []
+    ; header_len = 0
     ; current_tip_hash = genesis_hash
     ; blockchain_file
     ; has_changed_since_last_write = false
@@ -124,7 +127,7 @@ let create ~blockchain_file ~network =
     ; stop
     ; network
     ; header_check = None
-    ; last_checked_index = -1
+    ; checked_len = -1
     }
   in
   Network.set_callbacks network ~process_headers:(process_headers t);
@@ -149,7 +152,7 @@ let create ~blockchain_file ~network =
   end
   >>| fun () ->
   Core.Std.printf "Read %d headers from %s.\n%!"
-    (List.length t.headers) blockchain_file;
+    t.header_len blockchain_file;
   let stop = Ivar.read stop in
   Clock.every' ~stop (sec 30.) (fun () ->
     if t.has_changed_since_last_write then write_blockchain_file t
@@ -163,6 +166,17 @@ let create ~blockchain_file ~network =
     if 5 <= connected_node_count && need_syncing t ~now then begin
       List.nth_exn connected_nodes (Random.int connected_node_count)
       |> fun node -> start_syncing t node
+    end;
+    if 10 <= connected_node_count && t.checked_len < t.header_len
+    && Option.is_none t.header_check then begin
+      let header_check =
+        { addresses = Address.Hash_set.create ()
+        ; hash_to_check = t.current_tip_hash
+        ; hash_index = t.header_len
+        ; start_time = now
+        }
+      in
+      t.header_check <- Some header_check
     end
   );
   t
