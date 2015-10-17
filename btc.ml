@@ -6,7 +6,7 @@ open Async.Std
 let dns_server = "8.8.8.8"
 
 let dns_domains =
-  [ "seed.bitcoin.sipa.be"
+  [ "dnsseed.bluematt.me"
   ]
 
 let () =

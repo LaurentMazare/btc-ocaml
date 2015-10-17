@@ -211,7 +211,7 @@ let create ~blockchain_file ~network =
     ; stop
     ; network
     ; header_check = None
-    ; checked_len = -1
+    ; checked_len = 0
     }
   in
   Network.set_callbacks network ~process_headers:(process_headers t);

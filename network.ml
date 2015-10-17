@@ -84,7 +84,7 @@ let rec handle_connection t (node : Node.t) reader writer =
       | Inv _invs -> ()
       | Getheaders _ -> ()
       | Getblocks _ -> ()
-      | Headers headers -> t.process_headers ~node ~headers:(List.rev headers)
+      | Headers headers -> t.process_headers ~node ~headers
       | Notfound _ -> ()
       | Getdata _ -> ()
       | Tx _ -> ()
