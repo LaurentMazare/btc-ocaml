@@ -77,7 +77,6 @@ let write_blockchain_file t =
   (* The rename operation is atomic, this avoids corrupting the file if the process dies
      while writing it. *)
   Unix.rename ~src:tmp_file ~dst:t.blockchain_file
-  >>| fun () -> t.has_changed_since_last_write <- false
 
 let genesis_hash =
   Hash.of_hex "0x000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
@@ -245,9 +244,14 @@ let create ~blockchain_file ~network =
     t.header_len blockchain_file;
   let stop = Ivar.read stop in
   Clock.every' ~stop (sec 30.) (fun () ->
-    Core.Std.printf "Current blockchain length: %d, verified %d\n%!" t.header_len t.checked_len;
-    if t.has_changed_since_last_write then write_blockchain_file t
-    else Deferred.unit
+    Core.Std.printf "Current blockchain length: %d, verified %d. %s\n%!"
+      t.header_len
+      t.checked_len
+      (if t.has_changed_since_last_write then "writing blockchain file..." else "");
+    if t.has_changed_since_last_write then begin
+      write_blockchain_file t
+      >>| fun () -> t.has_changed_since_last_write <- false
+    end else Deferred.unit
   );
   Clock.every ~stop (sec 1.) (fun () -> refresh t);
   t
