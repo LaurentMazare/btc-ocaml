@@ -145,7 +145,7 @@ let check_timeout t ~now:now_ =
     if Time.(add header_check.start_time Hardcoded.check_timeout <= now_) then begin
       if Hardcoded.debug then
         Core.Std.printf "Header check timout.\n%!";
-      t.headers <- List.take t.headers t.checked_len;
+      t.headers <- List.drop t.headers (t.header_len - t.checked_len);
       t.header_len <- t.checked_len;
       t.current_tip_hash <-
         Option.value_map (List.hd t.headers) ~default:genesis_hash ~f:Header.hash;
