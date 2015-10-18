@@ -89,13 +89,12 @@ let process_headers t ~node ~headers =
   | Syncing sync_address when Address.(=) sync_address address ->
     t.last_batch_processed <- Time.now ();
     let headers_len = List.length headers in
-    let at_tip = List.length headers < Hardcoded.max_headers in
-    let headers_len_pre = List.length t.headers in
+    let at_tip = headers_len < Hardcoded.max_headers in
+    let headers_len_pre = t.header_len in
     List.iter headers ~f:(fun (header : Header.t) ->
       process_header t header ~mark_as_changed:true);
     if at_tip then begin
-      let headers_len_post = List.length t.headers in
-      if headers_len_post = headers_len + headers_len_pre then
+      if t.header_len = headers_len + headers_len_pre then
         t.status <- At_tip;
     end;
     if Hardcoded.debug then
