@@ -289,7 +289,7 @@ module Reject = struct
       ~message:(write fill_string Fn.id)
       ~code:(write Iobuf.Fill.uint8 Code.to_int)
       ~reason:(write fill_string Fn.id)
-      ~extra_data:(write Iobuf.Fill.string Fn.id)
+      ~extra_data:(write (fun str -> Iobuf.Fill.string str) Fn.id)
 end
 
 module Getblocks = struct
@@ -627,7 +627,7 @@ let handle_msg bigstring ~pos ~payload_len ~f =
       | otherwise -> Error (sprintf "Unknown command name: %s" otherwise)
     with
     | exn ->
-      Error (sprintf "Exception while parsing message: %s" (Exn.to_string exn))
+      Error (sprintf "Exception while parsing %s message: %s" command_name (Exn.to_string exn))
   in
   f msg
 
