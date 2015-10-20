@@ -17,6 +17,8 @@ module Hardcoded = struct
      do not reject this header. *)
   let check_nodes = 10
   let check_timeout = sec 60.
+
+  let on_check_failures_decrease_checked_len_by = 100
 end
 
 module Status = struct
@@ -149,6 +151,10 @@ let check_timeout t ~now:now_ =
       t.header_check <- None;
       (* Maybe remove/blacklist the host ? *)
       t.status <- Not_connected;
+      (* As the check failed, we are suspicious that even previously checked headers are
+         correct so decrease the checked length. *)
+      t.checked_len <-
+        max 0 (t.checked_len - Hardcoded.on_check_failures_decrease_checked_len_by)
     end
 
 let close t =
