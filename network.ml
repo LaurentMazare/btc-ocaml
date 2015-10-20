@@ -104,7 +104,8 @@ let rec handle_connection t (node : Node.t) reader writer =
       let `Consumed consumed = Message.handle_chunk chunk ~f ~pos ~len in
       return (`Consumed (consumed, `Need_unknown)))
   >>| fun status ->
-  log (status_string status) ~now:(Time.now ());
+  if Hardcoded.debug then
+    log (status_string status) ~now:(Time.now ());
   Ivar.fill_if_empty (Node.interrupt node) ();
   Hashtbl.remove t.per_address (Node.address node)
 and connect t node ~port =
