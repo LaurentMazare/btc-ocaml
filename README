@@ -15,7 +15,7 @@ btc-ocaml can be built using opam on a linux platform as follows.
 
 3. Running
 ----------
-The -blockchain flag is used to specify a file where the blockchain can be store and accessed.
+The -blockchain flag is used to specify a file where the blockchain can be stored and accessed.
   ./btc.native -blockchain ./blockchain.bin
 
 4. License
