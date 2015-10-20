@@ -2,7 +2,6 @@ open Core.Std
 open Async.Std
 
 module Hardcoded = struct
-  let debug = false
   (* When answering an open Getheaders query, headers message should contain 2000 headers
      except for the last message that contains less headers. *)
   let max_headers = 2_000
@@ -58,8 +57,8 @@ let process_header t (header : Header.t) ~mark_as_changed =
     if mark_as_changed then
       t.has_changed_since_last_write <- true;
   end else
-    Core.Std.printf
-      "Header current tip hash mismatch on block %d!\n  tip: %s\n  got: %s\n  nxt: %s\n%!"
+    Log.Global.error
+      "Header current tip hash mismatch on block %d!\n  tip: %s\n  got: %s\n  nxt: %s."
       t.header_len
       (Hash.to_hex t.current_tip_hash)
       (Hash.to_hex header.previous_block_header_hash)
@@ -96,8 +95,7 @@ let process_headers t ~node ~headers =
       if t.header_len = headers_len + headers_len_pre then
         t.status <- At_tip;
     end;
-    if Hardcoded.debug then
-      Core.Std.printf "New blockchain length: %d\n%!" (List.length t.headers);
+    Log.Global.debug "New blockchain length: %d." (List.length t.headers);
     if at_tip then ()
     else
       Node.send node (Message.getheaders ~from_hash:t.current_tip_hash ~stop_hash:None)
@@ -106,8 +104,7 @@ let process_headers t ~node ~headers =
     | Some header_check, [ header ] when Hash_set.mem header_check.addresses address
           && Hash.(=) (Header.hash header) header_check.hash_to_check ->
       Hash_set.remove header_check.addresses address;
-      if Hardcoded.debug then
-        Core.Std.printf "Received header confirmation.\n%!";
+      Log.Global.debug "Received header confirmation.";
       (* If we had enough confirmations consider this hash as confirmed. *)
       if Hash_set.length header_check.addresses < Hardcoded.check_nodes / 2 then begin
         t.header_check <- None;
@@ -143,8 +140,7 @@ let check_timeout t ~now:now_ =
   | None -> ()
   | Some header_check ->
     if Time.(add header_check.start_time Hardcoded.check_timeout <= now_) then begin
-      if Hardcoded.debug then
-        Core.Std.printf "Header check timout.\n%!";
+      Log.Global.debug "Header check timout.";
       t.headers <- List.drop t.headers (t.header_len - t.checked_len);
       t.header_len <- t.checked_len;
       t.current_tip_hash <-
@@ -191,8 +187,7 @@ let refresh t =
         Hash_set.add addresses address;
         Node.send rnd_node getheaders
     done;
-    if Hardcoded.debug then
-      Core.Std.printf "Checking %s %d\n%!" (Hash.to_hex t.current_tip_hash) t.header_len;
+    Log.Global.debug "Checking %s %d." (Hash.to_hex t.current_tip_hash) t.header_len;
     let header_check =
       { Header_check.addresses
       ; hash_to_check = t.current_tip_hash
@@ -240,11 +235,11 @@ let create ~blockchain_file ~network =
     | `No | `Unknown -> Deferred.unit
   end
   >>| fun () ->
-  Core.Std.printf "Read %d headers from %s.\n%!"
+  Log.Global.info "Read %d headers from %s."
     t.header_len blockchain_file;
   let stop = Ivar.read stop in
   Clock.every' ~stop (sec 30.) (fun () ->
-    Core.Std.printf "Current blockchain length: %d, verified %d. %s\n%!"
+    Log.Global.info "Current blockchain length: %d, verified %d. %s"
       t.header_len
       t.checked_len
       (if t.has_changed_since_last_write then "writing blockchain file..." else "");

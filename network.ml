@@ -10,7 +10,6 @@ module Hardcoded = struct
   let send_ping_after = sec 600.
 
   let port = 8333
-  let debug = false
 end
 
 type t =
@@ -32,9 +31,13 @@ let status_string = function
   | `Stopped () -> assert false
 
 let rec handle_connection t (node : Node.t) reader writer =
-  let log str ~now =
-    Core.Std.printf "%s: %s %s\n%!"
-      (Time.to_string now)
+  let log_debug str ~now =
+    Log.Global.debug ~time:now "%s %s"
+      (Address.ipv4 (Node.address node) |> Option.value ~default:"")
+      str
+  in
+  let log_error str ~now =
+    Log.Global.debug ~time:now "%s %s"
       (Address.ipv4 (Node.address node) |> Option.value ~default:"")
       str
   in
@@ -46,10 +49,9 @@ let rec handle_connection t (node : Node.t) reader writer =
   let f msg_or_error =
     let now = Time.now () in
     match msg_or_error with
-    | Error error -> log error ~now
+    | Error error -> log_error error ~now
     | Ok msg ->
-      if Hardcoded.debug then
-        log (Sexp.to_string (Message.sexp_of_t msg)) ~now;
+      log_debug (Sexp.to_string (Message.sexp_of_t msg)) ~now;
       match (msg : Message.t) with
       | Version version ->
         let status =
@@ -95,7 +97,7 @@ let rec handle_connection t (node : Node.t) reader writer =
       | Mempool -> ()
       | Merkleblock _ -> ()
       | Reject reject ->
-        log (sprintf "reject %s" (Message.Reject.sexp_of_t reject |> Sexp.to_string)) ~now
+        log_error (sprintf "reject %s" (Message.Reject.sexp_of_t reject |> Sexp.to_string)) ~now
       | Pong _ -> Node.set_last_seen node now
   in
   send (Message.version ());
@@ -104,8 +106,7 @@ let rec handle_connection t (node : Node.t) reader writer =
       let `Consumed consumed = Message.handle_chunk chunk ~f ~pos ~len in
       return (`Consumed (consumed, `Need_unknown)))
   >>| fun status ->
-  if Hardcoded.debug then
-    log (status_string status) ~now:(Time.now ());
+  log_debug (status_string status) ~now:(Time.now ());
   Ivar.fill_if_empty (Node.interrupt node) ();
   Hashtbl.remove t.per_address (Node.address node)
 and connect t node ~port =
@@ -168,8 +169,7 @@ let refresh t =
     List.nth_exn connected_nodes (Random.int connected_node_count)
     |> fun node -> Node.send node Message.Getaddr
   end;
-  Core.Std.printf "%s: %d/%d node(s).\n%!"
-    (Time.to_string (Time.now ()))
+  Log.Global.info "%d/%d node(s)."
     connected_node_count
     (Hashtbl.length t.per_address)
 
@@ -185,7 +185,7 @@ let create () =
   in
   Clock.every ~stop Hardcoded.refresh_span (fun () -> refresh t);
   let error_handler addr exn =
-    Core.Std.printf "Error in server: %s %s\n%!"
+    Log.Global.error "Error in server: %s %s"
       (Socket.Address.Inet.to_string addr)
       (Exn.to_string exn)
   in
@@ -194,7 +194,7 @@ let create () =
     (Tcp.on_port Hardcoded.port)
     (fun address reader writer ->
       let address = Socket.Address.Inet.to_string address in
-      Core.Std.printf "Rcvd %s\n%!" address;
+      Log.Global.info "Rcvd %s." address;
       let node = Node.create ~address:(Address.of_string address) in
       handle_connection t node reader writer
     )

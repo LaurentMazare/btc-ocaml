@@ -14,10 +14,13 @@ let () =
     ~summary:"test"
     Command.Spec.(
       empty
+      +> flag "-log-level" (optional_with_default `Info Log.Level.arg)
+        ~doc:"LOG-LEVEL debug|info|error"
       +> flag "-blockchain" (optional_with_default "./blockchain.bin" string)
         ~doc:"FILE file to load/store the blockchain headers from."
     )
-    (fun blockchain_file () ->
+    (fun log_level blockchain_file () ->
+      Log.Global.set_level log_level;
       Network.create ()
       >>= fun network ->
       Blockchain.create ~blockchain_file ~network
