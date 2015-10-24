@@ -44,8 +44,18 @@ let stats =
       +> flag "-rpc-port" (optional_with_default default_rpc_port int)
         ~doc:"PORT port number for the RPC server."
     )
-    (fun _rpc_port () ->
-      Deferred.unit
+    (fun rpc_port () ->
+      Btc_rpc.Client.get_stats ~rpc_port
+      >>| fun stats ->
+      let { Btc_rpc.Protocol.Stats.connected_nodes
+          ; known_nodes
+          ; blockchain_length
+          ; verified_length } = Or_error.ok_exn stats
+      in
+      printf "Connected nodes: %d\n" connected_nodes;
+      printf "Known nodes: %d\n" known_nodes;
+      printf "Blockchain length: %d\n" blockchain_length;
+      printf "Verified length: %d\n" verified_length
     )
 
 
