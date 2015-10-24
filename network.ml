@@ -24,6 +24,8 @@ let connected_nodes t =
     | Connected _ -> data :: acc
     | Pending -> acc)
 
+let known_nodes t = Hashtbl.to_alist t.per_address |> List.map ~f:snd
+
 let status_string = function
   | `Eof_with_unconsumed_data str ->
     sprintf "Received eof with unconsumed data (%d bytes)." (String.length str)

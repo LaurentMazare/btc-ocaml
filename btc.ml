@@ -22,12 +22,14 @@ let start_server =
       +> flag "-rpc-port" (optional_with_default default_rpc_port int)
         ~doc:"PORT port number for the RPC server."
     )
-    (fun log_level blockchain_file _rpc_port () ->
+    (fun log_level blockchain_file rpc_port () ->
       Log.Global.set_level log_level;
       Network.create ()
       >>= fun network ->
       Blockchain.create ~blockchain_file ~network
       >>= fun blockchain ->
+      Btc_rpc.Server.start ~network ~blockchain ~rpc_port
+      >>= fun () ->
       Deferred.List.iter dns_domains ~f:(fun domain ->
         Dns_lookup.query ~dns_server ~domain ~f:(fun ipv4_address ->
           Network.add_node network ~ipv4_address ~port:Network.Hardcoded.port)

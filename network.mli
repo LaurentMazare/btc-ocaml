@@ -25,3 +25,5 @@ val add_node
 val close : t -> unit
 
 val connected_nodes : t -> Node.t list
+
+val known_nodes : t -> Node.t list

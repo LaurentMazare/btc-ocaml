@@ -18,3 +18,11 @@ module Client : sig
     -> Protocol.Stats.response Or_error.t Deferred.t
 end
 
+module Server : sig
+  val start
+    :  network:Network.t
+    -> blockchain:Blockchain.t
+    -> rpc_port:int
+    -> unit Deferred.t
+end
+

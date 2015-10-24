@@ -256,3 +256,6 @@ let create ~blockchain_file ~network =
   );
   Clock.every ~stop (sec 1.) (fun () -> refresh t);
   t
+
+let blockchain_length t = t.header_len
+let verified_length t = t.checked_len
