@@ -1,6 +1,10 @@
 open Core.Std
 open Async.Std
 
+module Hardcoded : sig
+  val port : int
+end
+
 type t
 
 val create

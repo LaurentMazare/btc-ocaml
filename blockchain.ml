@@ -245,7 +245,7 @@ let create ~blockchain_file ~network =
     t.header_len blockchain_file;
   let stop = Ivar.read stop in
   Clock.every' ~stop (sec 30.) (fun () ->
-    Log.Global.info "Current blockchain length: %d, verified %d. %s"
+    Log.Global.debug "Current blockchain length: %d, verified %d. %s"
       t.header_len
       t.checked_len
       (if t.has_changed_since_last_write then "writing blockchain file..." else "");

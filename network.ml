@@ -169,7 +169,7 @@ let refresh t =
     List.nth_exn connected_nodes (Random.int connected_node_count)
     |> fun node -> Node.send node Message.Getaddr
   end;
-  Log.Global.info "%d/%d node(s)."
+  Log.Global.debug "%d/%d node(s)."
     connected_node_count
     (Hashtbl.length t.per_address)
 
@@ -194,7 +194,7 @@ let create () =
     (Tcp.on_port Hardcoded.port)
     (fun address reader writer ->
       let address = Socket.Address.Inet.to_string address in
-      Log.Global.info "Rcvd %s." address;
+      Log.Global.debug "Rcvd %s." address;
       let node = Node.create ~address:(Address.of_string address) in
       handle_connection t node reader writer
     )
