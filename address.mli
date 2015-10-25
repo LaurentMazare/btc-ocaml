@@ -1,6 +1,6 @@
 open Core.Std
 
-type t with sexp
+type t with sexp, bin_io
 val of_string : string -> t
 val to_string : t -> string
 

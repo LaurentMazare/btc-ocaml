@@ -259,3 +259,4 @@ let create ~blockchain_file ~network =
 
 let blockchain_length t = t.header_len
 let verified_length t = t.checked_len
+let tip_hash t = t.current_tip_hash

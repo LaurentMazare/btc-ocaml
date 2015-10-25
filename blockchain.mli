@@ -10,3 +10,4 @@ val close : t -> unit
 
 val blockchain_length : t -> int
 val verified_length : t -> int
+val tip_hash : t -> Hash.t

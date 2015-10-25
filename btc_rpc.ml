@@ -6,10 +6,11 @@ module Protocol = struct
     type query = unit with sexp, bin_io
 
     type response =
-      { connected_nodes : int
-      ; known_nodes : int
+      { connected_nodes : Address.t list
+      ; known_nodes : Address.t list
       ; blockchain_length : int
       ; verified_length : int
+      ; tip_hash : Hash.t
       } with sexp, bin_io
 
     let rpc =
@@ -22,10 +23,11 @@ module Protocol = struct
     let handle_query ~network ~blockchain =
       fun _connection_state () ->
         return
-          { connected_nodes = Network.connected_nodes network |> List.length
-          ; known_nodes = Network.known_nodes network |> List.length
+          { connected_nodes = Network.connected_nodes network |> List.map ~f:Node.address
+          ; known_nodes = Network.known_nodes network |> List.map ~f:Node.address
           ; blockchain_length = Blockchain.blockchain_length blockchain
           ; verified_length = Blockchain.verified_length blockchain
+          ; tip_hash = Blockchain.tip_hash blockchain
           }
   end
 end

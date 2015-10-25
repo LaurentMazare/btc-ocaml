@@ -4,11 +4,12 @@ open Async.Std
 module Protocol : sig
   module Stats : sig
     type response =
-      { connected_nodes : int
-      ; known_nodes : int
+      { connected_nodes : Address.t list
+      ; known_nodes : Address.t list
       ; blockchain_length : int
       ; verified_length : int
-      } with sexp_of
+      ; tip_hash : Hash.t
+      } with sexp, bin_io
   end
 end
 
