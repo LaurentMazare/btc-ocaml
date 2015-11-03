@@ -52,13 +52,13 @@ let stats =
       let { Btc_rpc.Protocol.Stats.connected_nodes
           ; known_nodes
           ; blockchain_length
-          ; verified_length
+          ; tip_depth
           ; tip_hash } = Or_error.ok_exn stats
       in
       printf "Connected nodes: %d\n" (List.length connected_nodes);
       printf "Known nodes: %d\n" (List.length known_nodes);
       printf "Blockchain length: %d\n" blockchain_length;
-      printf "Verified length: %d\n" verified_length;
+      printf "Tip depth: %d\n" tip_depth;
       printf "Current tip hash: %s\n" (Hash.to_hex tip_hash)
     )
 

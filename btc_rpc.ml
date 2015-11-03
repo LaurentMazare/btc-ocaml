@@ -9,7 +9,7 @@ module Protocol = struct
       { connected_nodes : Address.t list
       ; known_nodes : Address.t list
       ; blockchain_length : int
-      ; verified_length : int
+      ; tip_depth : int
       ; tip_hash : Hash.t
       } with sexp, bin_io
 
@@ -26,7 +26,7 @@ module Protocol = struct
           { connected_nodes = Network.connected_nodes network |> List.map ~f:Node.address
           ; known_nodes = Network.known_nodes network |> List.map ~f:Node.address
           ; blockchain_length = Blockchain.blockchain_length blockchain
-          ; verified_length = Blockchain.verified_length blockchain
+          ; tip_depth = Blockchain.tip_depth blockchain
           ; tip_hash = Blockchain.tip_hash blockchain
           }
   end

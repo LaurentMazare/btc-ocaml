@@ -7,7 +7,7 @@ module Protocol : sig
       { connected_nodes : Address.t list
       ; known_nodes : Address.t list
       ; blockchain_length : int
-      ; verified_length : int
+      ; tip_depth : int
       ; tip_hash : Hash.t
       } with sexp, bin_io
   end

@@ -39,3 +39,5 @@ let fill iobuf str = Iobuf.Fill.tail_padded_fixed_string iobuf str ~len:32 ~padd
 
 let zero = String.of_char_list (List.init 32 ~f:(fun _ -> '\000'))
 
+(* TODO *)
+let difficulty _t = 1.
