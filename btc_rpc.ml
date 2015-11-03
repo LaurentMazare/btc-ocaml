@@ -10,6 +10,7 @@ module Protocol = struct
       ; known_nodes : Address.t list
       ; blockchain_length : int
       ; tip_depth : int
+      ; tip_difficulty_sum : float
       ; tip_hash : Hash.t
       } with sexp, bin_io
 
@@ -27,6 +28,7 @@ module Protocol = struct
           ; known_nodes = Network.known_nodes network |> List.map ~f:Node.address
           ; blockchain_length = Blockchain.blockchain_length blockchain
           ; tip_depth = Blockchain.tip_depth blockchain
+          ; tip_difficulty_sum = Blockchain.tip_difficulty_sum blockchain
           ; tip_hash = Blockchain.tip_hash blockchain
           }
   end

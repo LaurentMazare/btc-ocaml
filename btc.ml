@@ -53,12 +53,14 @@ let stats =
           ; known_nodes
           ; blockchain_length
           ; tip_depth
+          ; tip_difficulty_sum
           ; tip_hash } = Or_error.ok_exn stats
       in
       printf "Connected nodes: %d\n" (List.length connected_nodes);
       printf "Known nodes: %d\n" (List.length known_nodes);
       printf "Blockchain length: %d\n" blockchain_length;
       printf "Tip depth: %d\n" tip_depth;
+      printf "Tip difficulty sum: %g\n" tip_difficulty_sum;
       printf "Current tip hash: %s\n" (Hash.to_hex tip_hash)
     )
 

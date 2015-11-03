@@ -8,6 +8,7 @@ module Protocol : sig
       ; known_nodes : Address.t list
       ; blockchain_length : int
       ; tip_depth : int
+      ; tip_difficulty_sum : float
       ; tip_hash : Hash.t
       } with sexp, bin_io
   end

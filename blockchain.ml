@@ -222,4 +222,5 @@ let create ~blockchain_file ~network =
 
 let blockchain_length t = Hashtbl.length t.headers
 let tip_depth t = t.current_tip.depth
+let tip_difficulty_sum t = t.current_tip.difficulty_sum
 let tip_hash t = t.current_tip.hash
