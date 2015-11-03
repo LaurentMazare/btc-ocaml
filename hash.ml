@@ -31,6 +31,16 @@ let to_hex str =
   in
   "0x" ^ hex
 
+let difficulty t =
+  let rec loop acc index =
+    if index < 0 then acc
+    else
+      let c = String.get t index |> Char.to_int in
+      loop (256. *. acc +. float c) (index - 1)
+  in
+  (* 1.1579e77 ~ 2^256 *)
+  1.1579e77 /. loop 0. (String.length t - 1)
+
 include String
 
 let consume iobuf = Iobuf.Consume.string iobuf ~len:32
@@ -39,5 +49,3 @@ let fill iobuf str = Iobuf.Fill.tail_padded_fixed_string iobuf str ~len:32 ~padd
 
 let zero = String.of_char_list (List.init 32 ~f:(fun _ -> '\000'))
 
-(* TODO *)
-let difficulty _t = 1.
