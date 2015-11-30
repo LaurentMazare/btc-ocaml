@@ -1,5 +1,5 @@
 let
- pkgs = import ~/nixpkgs {};
+ pkgs = import <nixpkgs> {};
  ocaml = pkgs.ocamlPackages_latest;
 in rec {
 
