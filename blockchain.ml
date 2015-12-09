@@ -54,7 +54,12 @@ type t =
 let process_header t (header : Header.t) ~mark_as_changed =
   let hash = Header.hash header in
   (* TODO: check [hash] vs [Header.hash header] *)
-  if not (Hashtbl.mem t.headers hash) then
+  match Hashtbl.find t.headers hash with
+    (* XCR aalekseyev: If we return Ok here, this will let [process_headers] work even if we already know some
+       of the blocks the peer is trying to send (e.g. when we are on an orphaned block).
+       lmazare: indeed.*)
+  | Some header_node -> Ok header_node
+  | None ->
     match Hashtbl.find t.headers header.previous_block_header_hash with
     | Some previous_header ->
       let header_node =
@@ -76,10 +81,6 @@ let process_header t (header : Header.t) ~mark_as_changed =
         (Hash.to_hex header.previous_block_header_hash)
         (Hash.to_hex t.current_tip.hash);
       Error "cannot find hash for previous block"
-  else
-    (* CR aalekseyev: If we return Ok here, this will let [process_headers] work even if we already know some
-      of the blocks the peer is trying to send (e.g. when we are on an orphaned block). *)
-    Error "hash is already present"
 
 let write_blockchain_file t =
   let tmp_file = sprintf "%s.tmp" t.blockchain_file in
