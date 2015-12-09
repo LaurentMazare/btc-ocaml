@@ -77,6 +77,8 @@ let process_header t (header : Header.t) ~mark_as_changed =
         (Hash.to_hex t.current_tip.hash);
       Error "cannot find hash for previous block"
   else
+    (* CR aalekseyev: If we return Ok here, this will let [process_headers] work even if we already know some
+      of the blocks the peer is trying to send (e.g. when we are on an orphaned block). *)
     Error "hash is already present"
 
 let write_blockchain_file t =
@@ -152,6 +154,9 @@ let sync_timeout t ~now:now_ =
 
 let start_syncing t node =
   t.status <- Syncing (Node.address node);
+  (* CR aalekseyev: if the node doesn't know our tip (e.g. the node is not up to date, or
+    we are on an orphaned block, this requests a download of the entire blockchain.
+    We should instead send multiple recent hashes in ~from_hash (rename it to ~from_the_highest_of or something?) *)
   Node.send node (Message.getheaders ~from_hash:t.current_tip.hash ~stop_hash:None)
 
 let close t =
