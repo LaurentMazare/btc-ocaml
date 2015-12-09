@@ -128,8 +128,8 @@ let process_headers t ~node ~headers =
     if at_tip then ()
     else
       Option.iter last_header_node ~f:(fun header_node ->
-        let from_hash = Header_node.hash header_node in
-        Node.send node (Message.getheaders ~from_hash ~stop_hash:None)
+        let from_the_highest_of = [ Header_node.hash header_node ] in
+        Node.send node (Message.getheaders ~from_the_highest_of ~stop_hash:None)
       )
   | Syncing _ | Not_connected | At_tip ->
     (* Discard this message. *)
@@ -155,10 +155,33 @@ let sync_timeout t ~now:now_ =
 
 let start_syncing t node =
   t.status <- Syncing (Node.address node);
-  (* CR aalekseyev: if the node doesn't know our tip (e.g. the node is not up to date, or
+  (* XCR aalekseyev: if the node doesn't know our tip (e.g. the node is not up to date, or
     we are on an orphaned block, this requests a download of the entire blockchain.
-    We should instead send multiple recent hashes in ~from_hash (rename it to ~from_the_highest_of or something?) *)
-  Node.send node (Message.getheaders ~from_hash:t.current_tip.hash ~stop_hash:None)
+    We should instead send multiple recent hashes in ~from_hash (rename it to ~from_the_highest_of or something?)
+    lmazare: good point.
+  *)
+  let rec loop acc header_hash step n =
+    (* TODO: we should store the current blockchain in an array for a faster lookup. *)
+    let acc, n, step =
+      if n = step then
+        header_hash :: acc, 1, 2*step
+      else
+        acc, n+1, step
+    in
+    match Hashtbl.find t.headers header_hash with
+    | None -> List.rev acc
+    | Some header_node ->
+      match header_node.Header_node.header with
+      | None -> List.rev acc
+      | Some header ->
+        loop acc (Header.previous_block_header_hash header) n step
+  in
+  let getheaders =
+    Message.getheaders
+      ~from_the_highest_of:(loop [] t.current_tip.hash 1 1)
+      ~stop_hash:None
+  in
+  Node.send node getheaders
 
 let close t =
   Ivar.fill_if_empty t.stop ()
