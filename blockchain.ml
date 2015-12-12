@@ -54,7 +54,12 @@ type t =
 let process_header t (header : Header.t) ~mark_as_changed =
   let hash = Header.hash header in
   (* TODO: check [hash] vs [Header.hash header] *)
-  if not (Hashtbl.mem t.headers hash) then
+  match Hashtbl.find t.headers hash with
+    (* XCR aalekseyev: If we return Ok here, this will let [process_headers] work even if we already know some
+       of the blocks the peer is trying to send (e.g. when we are on an orphaned block).
+       lmazare: indeed.*)
+  | Some header_node -> Ok header_node
+  | None ->
     match Hashtbl.find t.headers header.previous_block_header_hash with
     | Some previous_header ->
       let header_node =
@@ -76,8 +81,6 @@ let process_header t (header : Header.t) ~mark_as_changed =
         (Hash.to_hex header.previous_block_header_hash)
         (Hash.to_hex t.current_tip.hash);
       Error "cannot find hash for previous block"
-  else
-    Error "hash is already present"
 
 let write_blockchain_file t =
   let tmp_file = sprintf "%s.tmp" t.blockchain_file in
@@ -125,8 +128,8 @@ let process_headers t ~node ~headers =
     if at_tip then ()
     else
       Option.iter last_header_node ~f:(fun header_node ->
-        let from_hash = Header_node.hash header_node in
-        Node.send node (Message.getheaders ~from_hash ~stop_hash:None)
+        let from_the_highest_of = [ Header_node.hash header_node ] in
+        Node.send node (Message.getheaders ~from_the_highest_of ~stop_hash:None)
       )
   | Syncing _ | Not_connected | At_tip ->
     (* Discard this message. *)
@@ -152,7 +155,30 @@ let sync_timeout t ~now:now_ =
 
 let start_syncing t node =
   t.status <- Syncing (Node.address node);
-  Node.send node (Message.getheaders ~from_hash:t.current_tip.hash ~stop_hash:None)
+  let rec loop acc header_hash step n =
+    (* TODO: we should store the current blockchain in an array for a faster lookup. *)
+    let acc, n, step =
+      if n = step then
+        header_hash :: acc, 1, 2*step
+      else
+        acc, n+1, step
+    in
+    match Hashtbl.find t.headers header_hash with
+    | None ->
+      (* aalekseyev: seems like this should this be unreachable. *)
+      List.rev acc
+    | Some header_node ->
+      match header_node.Header_node.header with
+      | None -> List.rev acc
+      | Some header ->
+        loop acc (Header.previous_block_header_hash header) step n
+  in
+  let getheaders =
+    Message.getheaders
+      ~from_the_highest_of:(loop [] t.current_tip.hash 1 1)
+      ~stop_hash:None
+  in
+  Node.send node getheaders
 
 let close t =
   Ivar.fill_if_empty t.stop ()

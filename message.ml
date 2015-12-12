@@ -592,10 +592,10 @@ let version () =
     ; relay = 0
     }
 
-let getheaders ~from_hash ~stop_hash =
+let getheaders ~from_the_highest_of ~stop_hash =
   Getheaders
     { Getblocks.version = protocol_version
-    ; block_header_hashes = [ from_hash ]
+    ; block_header_hashes = from_the_highest_of
     ; stop_hash
     }
 

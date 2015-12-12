@@ -188,4 +188,11 @@ val handle_chunk
 val version : unit -> t
 val to_string : t -> string
 
-val getheaders : from_hash:Hash.t -> stop_hash:Hash.t option -> t
+(** [getheaders ~from_the_highest_of ~stop_hash] creates a request for new headers. This should be answered
+    by a peer starting from its highest known point in [from_the_highest_of]. [from_the_highest_of] should
+    be sorted in reverse order of block height.
+*)
+val getheaders
+  :  from_the_highest_of:Hash.t list
+  -> stop_hash:Hash.t option
+  -> t
