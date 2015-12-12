@@ -155,11 +155,6 @@ let sync_timeout t ~now:now_ =
 
 let start_syncing t node =
   t.status <- Syncing (Node.address node);
-  (* XCR aalekseyev: if the node doesn't know our tip (e.g. the node is not up to date, or
-    we are on an orphaned block, this requests a download of the entire blockchain.
-    We should instead send multiple recent hashes in ~from_hash (rename it to ~from_the_highest_of or something?)
-    lmazare: good point.
-  *)
   let rec loop acc header_hash step n =
     (* TODO: we should store the current blockchain in an array for a faster lookup. *)
     let acc, n, step =
@@ -169,12 +164,14 @@ let start_syncing t node =
         acc, n+1, step
     in
     match Hashtbl.find t.headers header_hash with
-    | None -> List.rev acc
+    | None ->
+      (* aalekseyev: seems like this should this be unreachable. *)
+      List.rev acc
     | Some header_node ->
       match header_node.Header_node.header with
       | None -> List.rev acc
       | Some header ->
-        loop acc (Header.previous_block_header_hash header) n step
+        loop acc (Header.previous_block_header_hash header) step n
   in
   let getheaders =
     Message.getheaders
