@@ -201,9 +201,9 @@ end
 module Headers = struct
   type t = Header.t list with sexp
 
-  let consume_iobuf iobuf = consume_list iobuf Header.consume_iobuf
+  let consume_iobuf iobuf = consume_list iobuf Header.consume_from_network
 
-  let fill_iobuf = fill_list Header.fill_iobuf
+  let fill_iobuf = fill_list Header.fill_for_network
 end
 
 module Reject = struct
@@ -444,7 +444,7 @@ module Block = struct
     } with sexp, fields
 
   let consume_iobuf iobuf =
-    let block_header = Header.consume_iobuf iobuf in
+    let block_header = Header.consume_from_network iobuf in
     let txns = consume_list iobuf Raw_transaction.consume_iobuf in
     Fields.create
       ~block_header
@@ -453,7 +453,7 @@ module Block = struct
   let fill_iobuf iobuf t =
     let write f g = fun field -> f iobuf (Field.get field t |> g) in
     Fields.iter
-      ~block_header:(write Header.fill_iobuf Fn.id)
+      ~block_header:(write Header.fill_for_network Fn.id)
       ~txns:(write (fill_list Raw_transaction.fill_iobuf) Fn.id)
 end
 
@@ -466,7 +466,7 @@ module Merkleblock = struct
     } with sexp, fields
 
   let consume_iobuf iobuf =
-    let block_header = Header.consume_iobuf iobuf in
+    let block_header = Header.consume_from_network iobuf in
     let transaction_count = Iobuf.Consume.uint32_le iobuf in
     let hashes = consume_list iobuf Hash.consume in
     let flags = consume_string iobuf in
@@ -479,7 +479,7 @@ module Merkleblock = struct
   let fill_iobuf iobuf t =
     let write f g = fun field -> f iobuf (Field.get field t |> g) in
     Fields.iter
-      ~block_header:(write Header.fill_iobuf Fn.id)
+      ~block_header:(write Header.fill_for_network Fn.id)
       ~transaction_count:(write Iobuf.Fill.uint32_le Fn.id)
       ~hashes:(write (fill_list Hash.fill) Fn.id)
       ~flags:(write fill_string Fn.id)
