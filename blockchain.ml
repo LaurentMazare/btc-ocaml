@@ -28,8 +28,11 @@ module Header_node = struct
     ; hash : Hash.t
     } with fields
 
-  let genesis_hash =
-    Hash.of_hex "0x000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
+  let genesis_hash = Header.hash Header.genesis
+
+  let () =
+    assert (Hash.(=) genesis_hash
+      (Hash.of_hex "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"))
 
   let genesis =
     { header = None
@@ -76,10 +79,11 @@ let process_header t (header : Header.t) ~mark_as_changed =
         t.current_tip <- header_node;
       Ok header_node
     | None ->
-      Log.Global.error "Cannot find hash for previous block!\n  block: %s\n  prev:  %s\n  tip:   %s"
+      Log.Global.error "Cannot find hash for previous block!\n  block: %s\n  prev:  %s\n  tip:   %s\n  full header: %s"
         (Hash.to_hex hash)
         (Hash.to_hex header.previous_block_header_hash)
-        (Hash.to_hex t.current_tip.hash);
+        (Hash.to_hex t.current_tip.hash)
+	(Sexp.to_string (Header.sexp_of_t header));
       Error "cannot find hash for previous block"
 
 let write_blockchain_file t =
