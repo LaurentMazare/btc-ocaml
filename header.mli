@@ -1,6 +1,6 @@
 open Core.Std
 
-module Nbits : sig
+module Bits : sig
   type t =
     { mantissa : int
     ; exponent : int
@@ -12,7 +12,7 @@ type t =
   ; previous_block_header_hash : Hash.t
   ; merkle_root_hash : Hash.t
   ; time : Time.t
-  ; nbits : Nbits.t
+  ; bits : Bits.t
   ; nonce : int
   } with sexp, fields, bin_io
 

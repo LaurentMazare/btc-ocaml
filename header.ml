@@ -1,6 +1,6 @@
 open Core.Std
 
-module Nbits = struct
+module Bits = struct
   type t =
     { mantissa : int
     ; exponent : int
@@ -28,17 +28,17 @@ type t =
   ; previous_block_header_hash : Hash.t
   ; merkle_root_hash : Hash.t
   ; time : Time.t
-  ; nbits : Nbits.t
+  ; bits : Bits.t
   ; nonce : int
   } with sexp, fields, bin_io
 
-let genesis = {
-  version = 1;
-  previous_block_header_hash = Hash.zero;
-  merkle_root_hash = Hash.of_hex "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b";
-  time = Time.of_string "2009-01-03 18:15:05 UTC";
-  nbits = { mantissa = 0x00ffff; exponent = 0x1d - 3; };
-  nonce = 0x7c2bac1d;
+let genesis =
+  { version = 1
+  ; previous_block_header_hash = Hash.zero
+  ; merkle_root_hash = Hash.of_hex "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"
+  ; time = Time.of_string "2009-01-03 18:15:05 UTC"
+  ; bits = { mantissa = 0x00ffff; exponent = 0x1d - 3; }
+  ; nonce = 0x7c2bac1d
   }
 
 let consume_iobuf iobuf =
@@ -46,7 +46,7 @@ let consume_iobuf iobuf =
   let previous_block_header_hash = Hash.consume iobuf in
   let merkle_root_hash = Hash.consume iobuf in
   let time = Iobuf.Consume.uint32_le iobuf |> float |> Time.of_float in
-  let nbits = Nbits.consume iobuf in
+  let bits = Bits.consume iobuf in
   let nonce = Iobuf.Consume.uint32_le iobuf in
   let transaction_count = Common.consume_compact_uint iobuf in
   assert (transaction_count = 0);
@@ -55,7 +55,7 @@ let consume_iobuf iobuf =
     ~previous_block_header_hash
     ~merkle_root_hash
     ~time
-    ~nbits
+    ~bits
     ~nonce
 
 let fill_for_hashing iobuf elem =
@@ -65,7 +65,7 @@ let fill_for_hashing iobuf elem =
     ~previous_block_header_hash:(write Hash.fill Fn.id)
     ~merkle_root_hash:(write Hash.fill Fn.id)
     ~time:(write Iobuf.Fill.uint32_le (fun time -> Time.to_epoch time |> Float.to_int))
-    ~nbits:(write Nbits.fill_iobuf Fn.id)
+    ~bits:(write Bits.fill_iobuf Fn.id)
     ~nonce:(write Iobuf.Fill.uint32_le Fn.id)
 
 let fill_iobuf iobuf elem =
