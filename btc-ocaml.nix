@@ -1,4 +1,5 @@
 let
+ # needs nixpkgs from https://github.com/Rotsor/nixpkgs for now
  pkgs = import <nixpkgs> {};
  ocaml = pkgs.ocamlPackages_latest;
 in rec {
