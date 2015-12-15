@@ -72,11 +72,6 @@ let fill_iobuf iobuf elem =
   fill_for_hashing iobuf elem;
   Common.fill_compact_uint iobuf 0 (* transaction count *)
 
-let char_of_hex i =
-  if 0 <= i && i < 10 then Char.of_int_exn (Char.to_int '0' + i)
-  else if 10 <= i && i < 16 then Char.of_int_exn (Char.to_int 'a' + i - 10)
-  else failwithf "not in hex range %d" i ()
-
 let hash =
   let header_len = 80 in
   let iobuf = Iobuf.create ~len:header_len in
@@ -90,4 +85,3 @@ let hash =
     done;
     Cryptokit.hash_string (Cryptokit.Hash.sha256 ()) (hash1 # result)
     |> Hash.of_string
-
