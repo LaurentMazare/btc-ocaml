@@ -28,13 +28,11 @@ module Header_node = struct
     ; hash : Hash.t
     } with fields
 
-  let genesis_hash =
-    Hash.of_hex "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
+  let genesis_hash = Header.hash Header.genesis
 
   let () =
-    if (genesis_hash <> Header.hash Header.genesis)
-    then failwithf "%s" (Hash.to_hex (Header.hash Header.genesis)) ()
-    else ()
+    assert (Hash.(=) genesis_hash
+      (Hash.of_hex "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"))
 
   let genesis =
     { header = None
@@ -58,8 +56,6 @@ type t =
 
 let process_header t (header : Header.t) ~mark_as_changed =
   let hash = Header.hash header in
-  assert (hash = Header.hash header);
-  Core.Std.Printf.printf "%s = %s\n%!" (Hash.to_hex hash) (Hash.to_hex (Header.hash header));
   (* TODO: check [hash] vs [Header.hash header] *)
   match Hashtbl.find t.headers hash with
     (* XCR aalekseyev: If we return Ok here, this will let [process_headers] work even if we already know some

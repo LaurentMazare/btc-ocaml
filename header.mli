@@ -18,8 +18,8 @@ type t =
 
 val hash : t -> Hash.t
 
-val consume_from_network : ([> read], Iobuf.seek) Iobuf.t -> t
+val consume_iobuf : ([> read], Iobuf.seek) Iobuf.t -> t
 
-val fill_for_network : (read_write, Iobuf.seek) Iobuf.t -> t -> unit
+val fill_iobuf : (read_write, Iobuf.seek) Iobuf.t -> t -> unit
 
 val genesis : t
